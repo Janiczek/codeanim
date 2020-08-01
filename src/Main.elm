@@ -1,7 +1,8 @@
 module Main exposing (main)
 
-import Action exposing (Action(..))
+import Action exposing (Action, RawAction)
 import Browser
+import Config exposing (fps, fpsF)
 import Element as E exposing (Element)
 import Element.Background as EBg
 import Element.Border as EBo
@@ -11,6 +12,9 @@ import FeatherIcons as FI exposing (Icon)
 import Format
 import Html.Attributes
 import List.Zipper as Zipper exposing (Zipper)
+import Project exposing (Project)
+import Scene exposing (Scene)
+import Time
 import Todo
 import Zoom
 
@@ -26,9 +30,9 @@ main =
 
 
 type alias Model =
-    { actions : List Action
-    , zoom : Int
+    { zoom : Int
     , currentFrame : Int
+    , project : Project
     }
 
 
@@ -46,22 +50,12 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init () =
-    ( { actions = Todo.actions
-      , zoom = 0
+    ( { zoom = 0
       , currentFrame = 0
+      , project = Todo.project
       }
     , Cmd.none
     )
-
-
-fps : Int
-fps =
-    60
-
-
-fpsF : Float
-fpsF =
-    toFloat 60
 
 
 view : Model -> Browser.Document Msg
@@ -81,23 +75,66 @@ view model =
                 , EBo.color (E.rgb255 0x22 0x22 0x22)
                 , EBg.color (E.rgb255 0x45 0x40 0x40)
                 ]
-                [ viewTimeline model ]
+                [ viewPreview model
+                , viewTimeline model
+                ]
             )
         ]
     }
+
+
+viewPreview :
+    { a
+        | currentFrame : Int
+        , project : Project
+    }
+    -> Element Msg
+viewPreview model =
+    E.el
+        [ E.height E.fill
+        , E.width E.fill
+        , E.padding 20
+        ]
+        (E.el
+            [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
+            , E.height E.fill
+            , E.width E.fill
+            , EBo.shadow
+                { offset = ( 1, 1 )
+                , size = 0
+                , blur = 5
+                , color = E.rgba255 0x10 0x00 0x00 0.75
+                }
+            ]
+            (viewRenderedScene model)
+        )
+
+
+viewRenderedScene :
+    { a
+        | currentFrame : Int
+        , project : Project
+    }
+    -> Element Msg
+viewRenderedScene model =
+    let
+        scene : Scene
+        scene =
+            Scene.compute model.currentFrame model.project
+    in
+    E.text <| Debug.toString scene
 
 
 viewTimeline :
     { a
         | currentFrame : Int
         , zoom : Int
-        , actions : List Action
+        , project : Project
     }
     -> Element Msg
-viewTimeline ({ currentFrame, zoom, actions } as model) =
+viewTimeline ({ currentFrame, zoom, project } as model) =
     E.column
         [ E.width E.fill
-        , E.alignBottom
         , EBo.widthEach
             { top = 1
             , bottom = 0
@@ -121,15 +158,10 @@ viewTimeline ({ currentFrame, zoom, actions } as model) =
 viewSecondsRuler :
     { a
         | zoom : Int
-        , actions : List Action
+        , project : Project
     }
     -> Element Msg
-viewSecondsRuler ({ zoom, actions } as model) =
-    let
-        frames : Int
-        frames =
-            lastFrame actions
-    in
+viewSecondsRuler ({ zoom, project } as model) =
     E.el
         ([ E.height (E.px 20)
          , EF.size 14
@@ -144,7 +176,7 @@ viewSecondsRuler ({ zoom, actions } as model) =
          ]
             ++ List.map
                 (viewRulerMarker model >> E.inFront)
-                (List.range 0 (frames // fps + 1))
+                (List.range 0 (project.totalFrames // fps + 1))
         )
         E.none
 
@@ -176,7 +208,7 @@ viewRulerMarker { zoom } i =
         , E.moveRight
             (toFloat
                 (Zoom.msToPx
-                    { ms = round (frameToMs frame)
+                    { ms = round (Time.frameToMs frame)
                     , zoom = zoom
                     }
                 )
@@ -190,13 +222,13 @@ viewRulerMarker { zoom } i =
 
 viewActions :
     { a
-        | actions : List Action
+        | project : Project
         , zoom : Int
     }
     -> Element Msg
-viewActions { actions, zoom } =
+viewActions { project, zoom } =
     E.row []
-        (List.map (viewAction zoom) actions)
+        (List.map (viewAction zoom) project.actions)
 
 
 viewCurrentFrameMarker :
@@ -210,7 +242,7 @@ viewCurrentFrameMarker { currentFrame, zoom } =
         [ E.moveRight
             (toFloat
                 (Zoom.msToPx
-                    { ms = round <| frameToMs currentFrame
+                    { ms = round <| Time.frameToMs currentFrame
                     , zoom = zoom
                     }
                 )
@@ -256,7 +288,7 @@ viewTimelineControls { currentFrame } =
                 "Frame: "
                     ++ String.fromInt currentFrame
                     ++ " ("
-                    ++ Format.msAsSeconds (round (frameToMs currentFrame))
+                    ++ Format.framesAsSeconds currentFrame
                     ++ ")"
             )
         , E.el []
@@ -287,15 +319,15 @@ viewAction : Int -> Action -> Element Msg
 viewAction zoom action =
     let
         color =
-            actionBgColor action
+            Action.bgColor action.raw
     in
     E.el
         [ EBg.color color
         , E.height (E.px 70)
         , E.width
             (E.px
-                (Zoom.msToPx
-                    { ms = Action.duration action
+                (Zoom.framesToPx
+                    { frames = Action.durationFrames action.raw
                     , zoom = zoom
                     }
                 )
@@ -305,9 +337,9 @@ viewAction zoom action =
         , EBo.color (darken 0.1 color)
         , EF.color (darken 0.3 color)
         , EF.size 14
-        , E.htmlAttribute (Html.Attributes.title (Action.tooltip action))
+        , E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
         ]
-        (viewActionText action)
+        (viewActionText action.raw)
 
 
 darken : Float -> E.Color -> E.Color
@@ -324,7 +356,7 @@ darken amount color =
         }
 
 
-viewActionText : Action -> Element Msg
+viewActionText : RawAction -> Element Msg
 viewActionText action =
     E.el
         [ E.paddingEach
@@ -334,30 +366,7 @@ viewActionText action =
             , right = 0
             }
         ]
-        (E.text <|
-            case action of
-                TypeText _ ->
-                    "Type"
-
-                Wait _ ->
-                    "Wait"
-
-                FadeOut _ ->
-                    "FadeOut"
-        )
-
-
-actionBgColor : Action -> E.Color
-actionBgColor action =
-    case action of
-        TypeText _ ->
-            E.rgb255 0xCC 0xDD 0xD0
-
-        Wait _ ->
-            E.rgb255 0xDD 0xBB 0xB0
-
-        FadeOut _ ->
-            E.rgb255 0xBB 0xCC 0xDD
+        (E.text (Action.label action))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -393,7 +402,7 @@ update msg model =
                 | currentFrame =
                     nextActionFrame
                         model.currentFrame
-                        model.actions
+                        model.project
               }
             , Cmd.none
             )
@@ -403,7 +412,7 @@ update msg model =
                 | currentFrame =
                     previousActionFrame
                         model.currentFrame
-                        model.actions
+                        model.project
               }
             , Cmd.none
             )
@@ -414,13 +423,13 @@ update msg model =
             )
 
         JumpToEnd ->
-            ( { model | currentFrame = lastFrame model.actions }
+            ( { model | currentFrame = model.project.totalFrames - 1 }
             , Cmd.none
             )
 
 
-previousActionFrame : Int -> List Action -> Int
-previousActionFrame currentFrame actions =
+previousActionFrame : Int -> Project -> Int
+previousActionFrame currentFrame { actions } =
     let
         go : Int -> List Action -> Int
         go accFrame actions_ =
@@ -430,11 +439,8 @@ previousActionFrame currentFrame actions =
 
                 action :: rest ->
                     let
-                        durationMs =
-                            Action.duration action
-
                         durationFrames =
-                            msToFrame durationMs
+                            Action.durationFrames action.raw
 
                         newAccFrame =
                             accFrame + durationFrames
@@ -448,8 +454,8 @@ previousActionFrame currentFrame actions =
     go 0 actions
 
 
-nextActionFrame : Int -> List Action -> Int
-nextActionFrame currentFrame actions =
+nextActionFrame : Int -> Project -> Int
+nextActionFrame currentFrame { actions } =
     let
         go : Int -> List Action -> Int
         go accFrame actions_ =
@@ -459,11 +465,8 @@ nextActionFrame currentFrame actions =
 
                 action :: rest ->
                     let
-                        durationMs =
-                            Action.duration action
-
                         durationFrames =
-                            msToFrame durationMs
+                            Action.durationFrames action.raw
 
                         newAccFrame =
                             accFrame + durationFrames
@@ -477,24 +480,6 @@ nextActionFrame currentFrame actions =
     go 0 actions
 
 
-lastFrame : List Action -> Int
-lastFrame actions =
-    List.foldl
-        (\action acc -> acc + msToFrame (Action.duration action))
-        0
-        actions
-
-
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
-
-
-frameToMs : Int -> Float
-frameToMs frame =
-    toFloat frame * 1000 / fpsF
-
-
-msToFrame : Int -> Int
-msToFrame ms =
-    round (toFloat ms / (1000 / fpsF))
