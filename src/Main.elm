@@ -8,6 +8,7 @@ import Element.Border as EBo
 import Element.Font as EF
 import Element.Input as EI
 import FeatherIcons as FI exposing (Icon)
+import Format
 import Html.Attributes
 import List.Zipper as Zipper exposing (Zipper)
 import Todo
@@ -53,6 +54,16 @@ init () =
     )
 
 
+fps : Int
+fps =
+    60
+
+
+fpsF : Float
+fpsF =
+    toFloat 60
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "CodeAnim"
@@ -67,6 +78,7 @@ view model =
                 , E.height (E.shrink |> E.minimum 500)
                 , E.centerY
                 , EBo.width 1
+                , EBo.color (E.rgb255 0x22 0x22 0x22)
                 , EBg.color (E.rgb255 0x45 0x40 0x40)
                 ]
                 [ viewTimeline model ]
@@ -82,56 +94,170 @@ viewTimeline :
         , actions : List Action
     }
     -> Element Msg
-viewTimeline { currentFrame, zoom, actions } =
-    let
-        markerWidth : Int
-        markerWidth =
-            2
-    in
+viewTimeline ({ currentFrame, zoom, actions } as model) =
     E.column
         [ E.width E.fill
         , E.alignBottom
-        , EBo.width 1
+        , EBo.widthEach
+            { top = 1
+            , bottom = 0
+            , left = 0
+            , right = 0
+            }
+        , EBo.color (E.rgb255 0x33 0x33 0x33)
         , E.clip
         ]
-        [ E.row [] (List.map (viewAction zoom) actions)
-        , E.el
-            [ E.moveRight
-                (toFloat
-                    (Zoom.msToPx
-                        { ms = round <| frameToMs currentFrame
-                        , zoom = zoom
-                        }
-                        -- centering:
-                        - (markerWidth // 2)
-                    )
-                )
-            , E.width (E.px markerWidth)
-            , E.height (E.px 20)
-            , EBg.color (E.rgb255 0xCC 0xCC 0xCC)
+        [ E.column
+            [ E.inFront <| viewCurrentFrameMarker model
+            , E.width E.fill
             ]
-            E.none
-        , viewTimelineButtons
+            [ viewSecondsRuler model
+            , viewActions model
+            ]
+        , viewTimelineControls model
         ]
 
 
-viewTimelineButtons : Element Msg
-viewTimelineButtons =
+viewSecondsRuler :
+    { a
+        | zoom : Int
+        , actions : List Action
+    }
+    -> Element Msg
+viewSecondsRuler ({ zoom, actions } as model) =
+    let
+        frames : Int
+        frames =
+            lastFrame actions
+    in
+    E.el
+        ([ E.height (E.px 20)
+         , EF.size 14
+         , E.width E.fill
+         , EBo.widthEach
+            { bottom = 1
+            , top = 0
+            , left = 0
+            , right = 0
+            }
+         , EBo.color (E.rgb255 0x33 0x33 0x33)
+         ]
+            ++ List.map
+                (viewRulerMarker model >> E.inFront)
+                (List.range 0 (frames // fps + 1))
+        )
+        E.none
+
+
+viewRulerMarker :
+    { a | zoom : Int }
+    -> Int
+    -> Element Msg
+viewRulerMarker { zoom } i =
+    let
+        frame =
+            i * fps
+    in
+    E.el
+        [ E.height (E.px 20)
+        , EF.color (E.rgb255 0x90 0x90 0x90)
+        , E.paddingEach
+            { left = 5
+            , top = 0
+            , right = 0
+            , bottom = 0
+            }
+        , EBo.widthEach
+            { left = 1
+            , top = 0
+            , right = 0
+            , bottom = 0
+            }
+        , E.moveRight
+            (toFloat
+                (Zoom.msToPx
+                    { ms = round (frameToMs frame)
+                    , zoom = zoom
+                    }
+                )
+            )
+        ]
+        (E.el
+            [ E.centerY ]
+            (E.text <| String.fromInt i ++ "s")
+        )
+
+
+viewActions :
+    { a
+        | actions : List Action
+        , zoom : Int
+    }
+    -> Element Msg
+viewActions { actions, zoom } =
+    E.row []
+        (List.map (viewAction zoom) actions)
+
+
+viewCurrentFrameMarker :
+    { a
+        | currentFrame : Int
+        , zoom : Int
+    }
+    -> Element Msg
+viewCurrentFrameMarker { currentFrame, zoom } =
+    E.el
+        [ E.moveRight
+            (toFloat
+                (Zoom.msToPx
+                    { ms = round <| frameToMs currentFrame
+                    , zoom = zoom
+                    }
+                )
+            )
+        , E.width (E.px 1)
+        , E.height E.fill
+        , EBg.color (E.rgb255 0xFF 0x00 0x00)
+        ]
+        E.none
+
+
+viewTimelineControls : { a | currentFrame : Int } -> Element Msg
+viewTimelineControls { currentFrame } =
     E.row
         [ E.spaceEvenly
         , E.width E.fill
+        , E.height E.fill
+        , EBo.widthEach
+            { top = 1
+            , bottom = 0
+            , left = 0
+            , right = 0
+            }
+        , EBo.color (E.rgb255 0x33 0x33 0x33)
         ]
         [ E.el []
             (E.row [ E.spacing 2 ]
                 [ viewTimelineButton JumpToStart FI.cornerLeftDown "Jump to start"
                 , viewTimelineButton JumpToPrevious FI.skipBack "Jump to previous action"
-                , viewTimelineButton (JumpBackward 10) FI.chevronsLeft "Jump backward"
+                , viewTimelineButton (JumpBackward 10) FI.chevronsLeft "Jump backward (10f)"
                 , viewTimelineButton (JumpBackward 1) FI.chevronLeft "Step backward"
                 , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
-                , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward"
+                , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
                 , viewTimelineButton JumpToNext FI.skipForward "Jump to next action"
                 , viewTimelineButton JumpToEnd FI.cornerRightDown "Jump to end"
                 ]
+            )
+        , E.el
+            [ E.centerY
+            , EF.color (E.rgb255 0xBB 0xBB 0xBB)
+            ]
+            (E.text <|
+                "Frame: "
+                    ++ String.fromInt currentFrame
+                    ++ " ("
+                    ++ Format.msAsSeconds (round (frameToMs currentFrame))
+                    ++ ")"
             )
         , E.el []
             (E.row [ E.spacing 2 ]
@@ -157,11 +283,6 @@ viewTimelineButton msg icon tooltip =
         }
 
 
-timelineZoom : Float
-timelineZoom =
-    1 / 20
-
-
 viewAction : Int -> Action -> Element Msg
 viewAction zoom action =
     let
@@ -183,6 +304,8 @@ viewAction zoom action =
         , EBo.width 2
         , EBo.color (darken 0.1 color)
         , EF.color (darken 0.3 color)
+        , EF.size 14
+        , E.htmlAttribute (Html.Attributes.title (Action.tooltip action))
         ]
         (viewActionText action)
 
@@ -369,9 +492,9 @@ subscriptions model =
 
 frameToMs : Int -> Float
 frameToMs frame =
-    toFloat frame * {- 1000 ms / 60 frames -} 50 / 3
+    toFloat frame * 1000 / fpsF
 
 
 msToFrame : Int -> Int
 msToFrame ms =
-    round (toFloat ms / {- 1000 ms / 60 frames -} (50 / 3))
+    round (toFloat ms / (1000 / fpsF))

@@ -1,7 +1,10 @@
 module Action exposing
     ( Action(..)
     , duration
+    , tooltip
     )
+
+import Format
 
 
 type Action
@@ -25,3 +28,22 @@ duration action =
 
         FadeOut r ->
             r.duration
+
+
+tooltip : Action -> String
+tooltip action =
+    case action of
+        TypeText { text } ->
+            "Type: "
+                ++ (if String.length text > 10 then
+                        String.left 10 text ++ "..."
+
+                    else
+                        text
+                   )
+
+        Wait r ->
+            "Wait " ++ Format.msAsSeconds r.duration
+
+        FadeOut r ->
+            "Fade out in " ++ Format.msAsSeconds r.duration
