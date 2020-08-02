@@ -6,10 +6,10 @@ Click to see demo:
 TODO:
 * deploy to GitHub pages
 * UI buttons to add/delete/reorder/change duration of actions
-* Export to SVG/GIF/MP4/PNGs/... play in fullscreen mode / ...
-    * [html2canvas](https://html2canvas.hertzen.com/)?
-    * [dom-to-image](https://github.com/tsayen/dom-to-image)?
-    * [dom-to-image-more](https://github.com/1904labs/dom-to-image-more)?
+* ~Export to SVG/GIF/MP4/PNGs/...~
+  * With the current way we render, neither `html2canvas` nor `dom-to-image*` are able to capture the DOM element properly. Looks like either we'll have to render it differently (hardcoded width/height for the preview / full-scene div and no SVG?)
+  * Or maybe have a Canvas-based renderer which would take serialized Scenes?
+  * Likely easier solution than that: play in fullscreen mode and just capture that with OBS?
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping
 * Audio track to play under the video?

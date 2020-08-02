@@ -40,10 +40,15 @@ type alias Model =
     { zoom : Int
     , currentFrame : Int
     , project : Project
-    , playing : Bool
+    , state : State
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
     }
+
+
+type State
+    = Paused
+    | Playing
 
 
 type Msg
@@ -69,7 +74,7 @@ init () =
     ( { zoom = 0
       , currentFrame = 0
       , project = Todo.project
-      , playing = False
+      , state = Paused
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
       }
@@ -87,6 +92,7 @@ view model =
         (E.column
             [ E.width E.fill
             , E.height E.fill
+            , E.clip
             ]
             [ viewPreview model
             , viewTimeline model
@@ -101,7 +107,14 @@ viewPreview :
         , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
-viewPreview model =
+viewPreview ({ project, currentFrame, hoveringAtFrame } as model) =
+    let
+        frame : Int
+        frame =
+            hoveringAtFrame
+                |> Maybe.map (min project.totalFrames)
+                |> Maybe.withDefault currentFrame
+    in
     E.el
         [ E.width E.fill
         , E.height E.fill
@@ -124,29 +137,25 @@ viewPreview model =
                 , color = E.rgba255 0x10 0x00 0x00 0.75
                 }
             ]
-            (viewRenderedScene model)
+            (viewSceneForFrame model frame)
         )
 
 
-viewRenderedScene :
-    { a
-        | currentFrame : Int
-        , project : Project
-        , hoveringAtFrame : Maybe Int
-    }
+viewSceneForFrame :
+    { a | project : Project }
+    -> Int
     -> Element Msg
-viewRenderedScene { currentFrame, project, hoveringAtFrame } =
+viewSceneForFrame ({ project } as model) frame =
     let
-        frame : Int
-        frame =
-            hoveringAtFrame
-                |> Maybe.map (min project.totalFrames)
-                |> Maybe.withDefault currentFrame
-
         scene : Scene
         scene =
             Scene.compute frame project
     in
+    viewScene model scene
+
+
+viewScene : { a | project : Project } -> Scene -> Element Msg
+viewScene { project } scene =
     E.el
         [ EBg.color project.codeBg
         , E.htmlAttribute (Html.Attributes.style "position" "absolute")
@@ -189,11 +198,11 @@ viewTimeline :
         | currentFrame : Int
         , zoom : Int
         , project : Project
-        , playing : Bool
+        , state : State
         , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
-viewTimeline ({ currentFrame, zoom, project, playing, hoveringAtFrame } as model) =
+viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) =
     E.column
         [ E.width E.fill
         , EBg.color (E.rgb255 0x50 0x50 0x50)
@@ -340,10 +349,11 @@ viewFrameMarker { zoom } frame color =
 viewTimelineControls :
     { a
         | currentFrame : Int
-        , playing : Bool
+        , state : State
+        , project : Project
     }
     -> Element Msg
-viewTimelineControls { currentFrame, playing } =
+viewTimelineControls { currentFrame, state, project } =
     E.row
         [ E.spaceEvenly
         , E.width E.fill
@@ -362,11 +372,12 @@ viewTimelineControls { currentFrame, playing } =
                 , viewTimelineButton JumpToPrevious FI.skipBack "Jump to previous action"
                 , viewTimelineButton (JumpBackward 10) FI.chevronsLeft "Jump backward (10f)"
                 , viewTimelineButton (JumpBackward 1) FI.chevronLeft "Step backward"
-                , if playing then
-                    viewTimelineButton Pause FI.pause "Pause"
+                , case state of
+                    Paused ->
+                        viewTimelineButton Play FI.play "Play"
 
-                  else
-                    viewTimelineButton Play FI.play "Play"
+                    Playing ->
+                        viewTimelineButton Pause FI.pause "Pause"
                 , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
                 , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
                 , viewTimelineButton JumpToNext FI.skipForward "Jump to next action"
@@ -470,7 +481,7 @@ viewActionText action =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case Debug.log "msg" msg of
+    case msg of
         ZoomIn ->
             ( { model | zoom = model.zoom + 1 }
             , Cmd.none
@@ -522,52 +533,60 @@ update msg model =
             )
 
         JumpToEnd ->
-            ( { model | currentFrame = model.project.totalFrames - 1 }
+            ( { model | currentFrame = model.project.endFrame }
             , Cmd.none
             )
 
         Play ->
-            ( { model | playing = True }
+            ( { model | state = Playing }
             , Cmd.none
             )
 
         Pause ->
-            ( { model | playing = False }
+            ( { model | state = Paused }
             , Cmd.none
             )
 
         Tick delta ->
-            if model.playing then
-                let
-                    delta_ =
-                        delta + model.leftoverDelta
+            case model.state of
+                Playing ->
+                    let
+                        delta_ =
+                            delta + model.leftoverDelta
 
-                    advancedFrames =
-                        floor <| Time.msToFrame delta_
+                        advancedFrames =
+                            floor <| Time.msToFrame delta_
 
-                    newLeftoverDelta =
-                        delta_ - Time.frameToMs advancedFrames
+                        advancedCurrentFrame =
+                            model.currentFrame + advancedFrames
 
-                    ideallyNewCurrentFrame =
-                        model.currentFrame + advancedFrames
+                        hasEnded =
+                            advancedCurrentFrame >= model.project.totalFrames
 
-                    ( newCurrentFrame, newPlaying ) =
-                        if ideallyNewCurrentFrame >= model.project.totalFrames then
-                            ( model.project.totalFrames - 1, False )
+                        newLeftoverDelta =
+                            if hasEnded then
+                                0
 
-                        else
-                            ( ideallyNewCurrentFrame, True )
-                in
-                ( { model
-                    | leftoverDelta = newLeftoverDelta
-                    , currentFrame = newCurrentFrame
-                    , playing = newPlaying
-                  }
-                , Cmd.none
-                )
+                            else
+                                delta_ - Time.frameToMs advancedFrames
 
-            else
-                ( model, Cmd.none )
+                        ( newCurrentFrame, newState ) =
+                            if hasEnded then
+                                ( model.project.endFrame, Paused )
+
+                            else
+                                ( advancedCurrentFrame, Playing )
+                    in
+                    ( { model
+                        | leftoverDelta = newLeftoverDelta
+                        , currentFrame = newCurrentFrame
+                        , state = newState
+                      }
+                    , Cmd.none
+                    )
+
+                Paused ->
+                    ( model, Cmd.none )
 
         HoverAt px ->
             let
@@ -653,8 +672,9 @@ nextActionFrame currentFrame { actions } =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    if model.playing then
-        Browser.Events.onAnimationFrameDelta Tick
+    case model.state of
+        Paused ->
+            Sub.none
 
-    else
-        Sub.none
+        Playing ->
+            Browser.Events.onAnimationFrameDelta Tick

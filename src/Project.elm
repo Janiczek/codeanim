@@ -7,6 +7,7 @@ import Element as E
 type alias Project =
     { actions : List Action
     , totalFrames : Int
+    , endFrame : Int
     , codeBg : E.Color
     }
 
@@ -23,5 +24,6 @@ init { actions, codeBg } =
     in
     { actions = processedActions
     , totalFrames = totalFrames
+    , endFrame = totalFrames - 1
     , codeBg = codeBg
     }

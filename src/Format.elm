@@ -1,6 +1,16 @@
-module Format exposing (framesAsSeconds)
+module Format exposing
+    ( framesAsSeconds
+    , percentage
+    )
 
 import Time
+
+
+{-| p = 0..1
+-}
+percentage : Float -> String
+percentage p =
+    String.fromInt (round (p * 100)) ++ "%"
 
 
 framesAsSeconds : Int -> String

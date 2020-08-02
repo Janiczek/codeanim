@@ -3,7 +3,7 @@ pre[class*="language-"] {
 	color: #D9D7CE;
 	background: none;
 	text-shadow: 0 1px rgba(0, 0, 0, 0.3);
-	font-family: monospace;
+	font-family: 'Iosevka Janiczek Web', monospace;
 	/*font-size: 1em;*/
 	text-align: left;
 	white-space: pre;
