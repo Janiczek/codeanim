@@ -44,11 +44,10 @@ actions =
         }
     , Wait
         { durationFrames = ms 500 }
-
-    --, FadeOut
-    --{ durationFrames = ms 1000 }
-    --, Wait
-    --{ durationFrames = ms 1000 }
+    , FadeOutAndBlank
+        { durationFrames = ms 1000 }
+    , Wait
+        { durationFrames = ms 1000 }
     , TypeText
         { text =
             """example : Minithesis.TestResult
@@ -57,6 +56,20 @@ example =
 
 
 """
+        , durationFrames = ms 700
+        , position = Nothing
+        }
+    , Wait
+        { durationFrames = ms 300 }
+    , BlankText
+    , Wait
+        { durationFrames = ms 300 }
+    , SetText
+        "-- this text has been set without the typewriter effect\n\n\n"
+    , Wait
+        { durationFrames = ms 300 }
+    , TypeText
+        { text = "import Minithesis.Generator as Gen\n\n\n"
         , durationFrames = ms 700
         , position = Nothing
         }

@@ -73,7 +73,7 @@ compute currentFrame project =
                             Wait _ ->
                                 accScene
 
-                            FadeOut r ->
+                            FadeOutAndBlank r ->
                                 goFadeOut r frame currentAction accScene
 
                             BlankText ->

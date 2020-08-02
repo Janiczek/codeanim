@@ -139,6 +139,7 @@ viewRenderedScene { currentFrame, project, hoveringAtFrame } =
         frame : Int
         frame =
             hoveringAtFrame
+                |> Maybe.map (min project.totalFrames)
                 |> Maybe.withDefault currentFrame
 
         scene : Scene
@@ -188,9 +189,10 @@ viewTimeline :
         , zoom : Int
         , project : Project
         , playing : Bool
+        , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
-viewTimeline ({ currentFrame, zoom, project, playing } as model) =
+viewTimeline ({ currentFrame, zoom, project, playing, hoveringAtFrame } as model) =
     E.column
         [ E.width E.fill
         , EBg.color (E.rgb255 0x50 0x50 0x50)
@@ -204,7 +206,21 @@ viewTimeline ({ currentFrame, zoom, project, playing } as model) =
         , E.clip
         ]
         [ E.column
-            [ E.inFront <| viewCurrentFrameMarker model
+            [ E.inFront <|
+                viewFrameMarker
+                    model
+                    currentFrame
+                    (E.rgb255 0xFF 0x00 0x00)
+            , E.inFront <|
+                case hoveringAtFrame of
+                    Just frame ->
+                        viewFrameMarker
+                            model
+                            frame
+                            (E.rgb255 0xFF 0xFF 0xFF)
+
+                    Nothing ->
+                        E.none
             , E.width E.fill
             ]
             [ viewSecondsRuler model
@@ -289,31 +305,31 @@ viewActions ({ project } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
             |> E.mapAttribute HoverAt
-        , E.htmlAttribute (Html.Events.onMouseLeave HoverOff)
+        , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
         ]
         (List.map (viewAction model) project.actions)
 
 
-viewCurrentFrameMarker :
-    { a
-        | currentFrame : Int
-        , zoom : Int
-    }
+viewFrameMarker :
+    { a | zoom : Int }
+    -> Int
+    -> E.Color
     -> Element Msg
-viewCurrentFrameMarker { currentFrame, zoom } =
+viewFrameMarker { zoom } frame color =
     E.el
         [ E.moveRight
             (toFloat
                 (Zoom.frameToPx
-                    { frame = currentFrame
+                    { frame = frame
                     , zoom = zoom
                     }
                 )
             )
+        , E.htmlAttribute (Html.Attributes.style "pointer-events" "none")
         , E.width (E.px 1)
         , E.height E.fill
-        , EBg.color (E.rgb255 0xFF 0x00 0x00)
+        , EBg.color color
         ]
         E.none
 
@@ -451,7 +467,7 @@ viewActionText action =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case Debug.log "msg" msg of
         ZoomIn ->
             ( { model | zoom = model.zoom + 1 }
             , Cmd.none

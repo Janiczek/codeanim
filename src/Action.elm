@@ -24,7 +24,7 @@ bgColor action =
         Wait _ ->
             E.rgb255 0xDD 0xBB 0xB0
 
-        FadeOut _ ->
+        FadeOutAndBlank _ ->
             E.rgb255 0xBB 0xCC 0xDD
 
         BlankText ->
@@ -37,7 +37,7 @@ bgColor action =
 type RawAction
     = TypeText TypeTextOptions
     | Wait WaitOptions
-    | FadeOut FadeOutOptions
+    | FadeOutAndBlank FadeOutOptions
     | BlankText
     | SetText String
 
@@ -73,7 +73,7 @@ durationFrames action =
         Wait r ->
             r.durationFrames
 
-        FadeOut r ->
+        FadeOutAndBlank r ->
             r.durationFrames
 
         BlankText ->
@@ -107,7 +107,7 @@ label action =
         Wait _ ->
             "Wait"
 
-        FadeOut _ ->
+        FadeOutAndBlank _ ->
             "FadeOut"
 
         BlankText ->
@@ -127,8 +127,8 @@ tooltip action =
         Wait r ->
             "Wait " ++ Format.framesAsSeconds r.durationFrames
 
-        FadeOut r ->
-            "Fade out in " ++ Format.framesAsSeconds r.durationFrames
+        FadeOutAndBlank r ->
+            "Fade out and blank text in " ++ Format.framesAsSeconds r.durationFrames
 
         BlankText ->
             "Blank text"
