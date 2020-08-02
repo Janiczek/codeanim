@@ -77,10 +77,16 @@ durationFrames action =
             r.durationFrames
 
         BlankText ->
-            0
+            {- TODO make this ms-based so that it takes the same amount of time
+               with different FPS settings
+            -}
+            6
 
         SetText _ ->
-            0
+            {- TODO make this ms-based so that it takes the same amount of time
+               with different FPS settings
+            -}
+            6
 
 
 snippet : String -> String

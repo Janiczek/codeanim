@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>CodeAnim</title>
+        <link rel="stylesheet" href="./assets/prism.css">
+    </head>
+    <body>
+        <div id="elm"></div>
+        <script src="./assets/prism.js"></script>
+        <script src="./assets/x-tag-polyfilled.min.js"></script>
+        <script src="./assets/x-highlight.js"></script>
+        <script src="./build/elm.js"></script>
+        <script>
+            var app = Elm.Main.init({node: window.elm});
+        </script>
+    </body>
+</html>

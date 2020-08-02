@@ -10,8 +10,10 @@ import Element.Font as EF
 import Element.Input as EI
 import FeatherIcons as FI exposing (Icon)
 import Format
+import Html exposing (Html)
 import Html.Attributes
 import List.Zipper as Zipper exposing (Zipper)
+import Markdown
 import Project exposing (Project)
 import Scene exposing (Scene)
 import Time
@@ -21,7 +23,7 @@ import Zoom
 
 main : Program () Model Msg
 main =
-    Browser.document
+    Browser.element
         { init = init
         , view = view
         , update = update
@@ -58,29 +60,21 @@ init () =
     )
 
 
-view : Model -> Browser.Document Msg
+view : Model -> Html Msg
 view model =
-    { title = "CodeAnim"
-    , body =
-        [ E.layout
-            [ EBg.color (E.rgb255 0x33 0x33 0x33)
-            , E.width E.fill
-            ]
-            (E.column
-                [ E.centerX
-                , E.width (E.fill |> E.maximum 800)
-                , E.height (E.shrink |> E.minimum 500)
-                , E.centerY
-                , EBo.width 1
-                , EBo.color (E.rgb255 0x22 0x22 0x22)
-                , EBg.color (E.rgb255 0x45 0x40 0x40)
-                ]
-                [ viewPreview model
-                , viewTimeline model
-                ]
-            )
+    E.layout
+        [ EBg.color (E.rgb255 0x70 0x70 0x70)
+        , E.width E.fill
+        , E.height E.fill
         ]
-    }
+        (E.column
+            [ E.width E.fill
+            , E.height E.fill
+            ]
+            [ viewPreview model
+            , viewTimeline model
+            ]
+        )
 
 
 viewPreview :
@@ -116,13 +110,26 @@ viewRenderedScene :
         , project : Project
     }
     -> Element Msg
-viewRenderedScene model =
+viewRenderedScene { currentFrame, project } =
     let
         scene : Scene
         scene =
-            Scene.compute model.currentFrame model.project
+            Scene.compute currentFrame project
     in
-    E.text <| Debug.toString scene
+    E.el
+        [ EBg.color project.codeBg
+        , E.width E.fill
+        , E.height E.fill
+        , E.padding 20
+        ]
+        (E.el
+            [ E.alpha scene.opacity ]
+            (E.html <|
+                Html.node "x-highlight"
+                    [ Html.Attributes.attribute "data-code" scene.text ]
+                    []
+            )
+        )
 
 
 viewTimeline :
@@ -135,6 +142,7 @@ viewTimeline :
 viewTimeline ({ currentFrame, zoom, project } as model) =
     E.column
         [ E.width E.fill
+        , EBg.color (E.rgb255 0x50 0x50 0x50)
         , EBo.widthEach
             { top = 1
             , bottom = 0

@@ -11,7 +11,6 @@ project =
     Project.init
         { actions = actions
         , codeBg = E.rgb255 0x33 0x33 0x33
-        , codeColor = E.rgb255 0xF0 0xF0 0xF0
         }
 
 

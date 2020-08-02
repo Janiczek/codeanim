@@ -8,17 +8,15 @@ type alias Project =
     { actions : List Action
     , totalFrames : Int
     , codeBg : E.Color
-    , codeColor : E.Color
     }
 
 
 init :
     { actions : List RawAction
     , codeBg : E.Color
-    , codeColor : E.Color
     }
     -> Project
-init { actions, codeBg, codeColor } =
+init { actions, codeBg } =
     let
         ( totalFrames, processedActions ) =
             Action.process actions
@@ -26,5 +24,4 @@ init { actions, codeBg, codeColor } =
     { actions = processedActions
     , totalFrames = totalFrames
     , codeBg = codeBg
-    , codeColor = codeColor
     }
