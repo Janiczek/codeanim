@@ -13,6 +13,8 @@ import FeatherIcons as FI exposing (Icon)
 import Format
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
+import Json.Decode exposing (Decoder)
 import List.Zipper as Zipper exposing (Zipper)
 import Markdown
 import Project exposing (Project)
@@ -40,6 +42,7 @@ type alias Model =
     , project : Project
     , playing : Bool
     , leftoverDelta : Float
+    , hoveringAtFrame : Maybe Int
     }
 
 
@@ -56,6 +59,8 @@ type Msg
     | Play
     | Pause
     | Tick Float
+    | HoverAt Int
+    | HoverOff
 
 
 init : () -> ( Model, Cmd Msg )
@@ -64,6 +69,7 @@ init () =
       , currentFrame = 0
       , project = Todo.project
       , playing = False
+      , hoveringAtFrame = Nothing
       , leftoverDelta = 0
       }
     , Cmd.none
@@ -91,6 +97,7 @@ viewPreview :
     { a
         | currentFrame : Int
         , project : Project
+        , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
 viewPreview model =
@@ -124,13 +131,19 @@ viewRenderedScene :
     { a
         | currentFrame : Int
         , project : Project
+        , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
-viewRenderedScene { currentFrame, project } =
+viewRenderedScene { currentFrame, project, hoveringAtFrame } =
     let
+        frame : Int
+        frame =
+            hoveringAtFrame
+                |> Maybe.withDefault currentFrame
+
         scene : Scene
         scene =
-            Scene.compute currentFrame project
+            Scene.compute frame project
     in
     E.el
         [ EBg.color project.codeBg
@@ -253,8 +266,8 @@ viewRulerMarker { zoom } i =
             }
         , E.moveRight
             (toFloat
-                (Zoom.msToPx
-                    { ms = round (Time.frameToMs frame)
+                (Zoom.frameToPx
+                    { frame = frame
                     , zoom = zoom
                     }
                 )
@@ -272,9 +285,14 @@ viewActions :
         , zoom : Int
     }
     -> Element Msg
-viewActions { project, zoom } =
-    E.row []
-        (List.map (viewAction zoom) project.actions)
+viewActions ({ project } as model) =
+    E.row
+        [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
+            |> E.mapAttribute HoverAt
+        , E.htmlAttribute (Html.Events.onMouseLeave HoverOff)
+        , E.width E.fill
+        ]
+        (List.map (viewAction model) project.actions)
 
 
 viewCurrentFrameMarker :
@@ -287,8 +305,8 @@ viewCurrentFrameMarker { currentFrame, zoom } =
     E.el
         [ E.moveRight
             (toFloat
-                (Zoom.msToPx
-                    { ms = round <| Time.frameToMs currentFrame
+                (Zoom.frameToPx
+                    { frame = currentFrame
                     , zoom = zoom
                     }
                 )
@@ -371,8 +389,8 @@ viewTimelineButton msg icon tooltip =
         }
 
 
-viewAction : Int -> Action -> Element Msg
-viewAction zoom action =
+viewAction : { a | zoom : Int } -> Action -> Element Msg
+viewAction { zoom } action =
     let
         color =
             Action.bgColor action.raw
@@ -382,8 +400,8 @@ viewAction zoom action =
         , E.height (E.px 70)
         , E.width
             (E.px
-                (Zoom.framesToPx
-                    { frames = Action.durationFrames action.raw
+                (Zoom.frameToPx
+                    { frame = Action.durationFrames action.raw
                     , zoom = zoom
                     }
                 )
@@ -391,11 +409,17 @@ viewAction zoom action =
         , E.clip
         , EBo.width 2
         , EBo.color (darken 0.1 color)
+        , EBo.rounded 4
         , EF.color (darken 0.3 color)
         , EF.size 14
         , E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
         ]
         (viewActionText action.raw)
+
+
+currentPxDecoder : Decoder Int
+currentPxDecoder =
+    Json.Decode.field "clientX" Json.Decode.int
 
 
 darken : Float -> E.Color -> E.Color
@@ -525,6 +549,23 @@ update msg model =
 
             else
                 ( model, Cmd.none )
+
+        HoverAt px ->
+            let
+                frame =
+                    Zoom.pxToFrame
+                        { px = px
+                        , zoom = model.zoom
+                        }
+            in
+            ( { model | hoveringAtFrame = Just frame }
+            , Cmd.none
+            )
+
+        HoverOff ->
+            ( { model | hoveringAtFrame = Nothing }
+            , Cmd.none
+            )
 
 
 previousActionFrame : Int -> Project -> Int

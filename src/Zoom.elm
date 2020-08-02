@@ -1,4 +1,4 @@
-module Zoom exposing (framesToPx, msToPx)
+module Zoom exposing (frameToPx, pxToFrame)
 
 import Time
 
@@ -8,19 +8,23 @@ globalMultiplier =
     1 / 20
 
 
-framesToPx : { frames : Int, zoom : Int } -> Int
-framesToPx { frames, zoom } =
-    msToPx
-        { ms = ceiling (Time.frameToMs frames)
-        , zoom = zoom
-        }
+zoomMultiplier : Int -> Float
+zoomMultiplier zoom =
+    1 + toFloat zoom / 10
 
 
-msToPx : { ms : Int, zoom : Int } -> Int
-msToPx { ms, zoom } =
-    let
-        zoomMultiplier : Float
-        zoomMultiplier =
-            1 + toFloat zoom / 10
-    in
-    round <| toFloat ms * globalMultiplier * zoomMultiplier
+frameToPx : { frame : Int, zoom : Int } -> Int
+frameToPx { frame, zoom } =
+    round <|
+        Time.frameToMs frame
+            * globalMultiplier
+            * zoomMultiplier zoom
+
+
+pxToFrame : { px : Int, zoom : Int } -> Int
+pxToFrame { px, zoom } =
+    round <|
+        Time.msToFrame <|
+            toFloat px
+                / globalMultiplier
+                / zoomMultiplier zoom

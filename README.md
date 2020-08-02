@@ -10,7 +10,6 @@ TODO:
     * [html2canvas](https://html2canvas.hertzen.com/)?
     * [dom-to-image](https://github.com/tsayen/dom-to-image)?
     * [dom-to-image-more](https://github.com/1904labs/dom-to-image-more)?
-* Scrub by mouse-hovering
 * Jump to a specific frame by mouse-clicking
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping

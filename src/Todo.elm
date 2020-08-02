@@ -14,34 +14,41 @@ project =
         }
 
 
+ms : Int -> Int
+ms ms_ =
+    ceiling <| Time.msToFrame (toFloat ms_)
+
+
 actions : List RawAction
 actions =
-    [ TypeText
+    [ Wait
+        { durationFrames = ms 500 }
+    , TypeText
         { text = "module Example exposing (example)\n\n\n"
-        , durationFrames = ceiling <| Time.msToFrame 2000
+        , durationFrames = ms 2000
         , position = Nothing
         }
     , Wait
-        { durationFrames = ceiling <| Time.msToFrame 2000 }
+        { durationFrames = ms 2000 }
     , TypeText
         { text = "import Minithesis\n"
-        , durationFrames = ceiling <| Time.msToFrame 700
+        , durationFrames = ms 700
         , position = Nothing
         }
     , Wait
-        { durationFrames = ceiling <| Time.msToFrame 300 }
+        { durationFrames = ms 300 }
     , TypeText
         { text = "import Minithesis.Generator as Gen\n\n\n"
-        , durationFrames = ceiling <| Time.msToFrame 700
+        , durationFrames = ms 700
         , position = Nothing
         }
     , Wait
-        { durationFrames = ceiling <| Time.msToFrame 500 }
+        { durationFrames = ms 500 }
 
     --, FadeOut
-    --{ durationFrames = ceiling <| Time.msToFrame 1000 }
+    --{ durationFrames = ms 1000 }
     --, Wait
-    --{ durationFrames = ceiling <| Time.msToFrame 1000 }
+    --{ durationFrames = ms 1000 }
     , TypeText
         { text =
             """example : Minithesis.TestResult
@@ -50,7 +57,7 @@ example =
 
 
 """
-        , durationFrames = ceiling <| Time.msToFrame 700
+        , durationFrames = ms 700
         , position = Nothing
         }
     ]
