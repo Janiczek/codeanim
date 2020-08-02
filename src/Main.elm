@@ -1,4 +1,4 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Action exposing (Action, RawAction)
 import Browser
@@ -17,10 +17,12 @@ import Html.Events
 import Json.Decode exposing (Decoder)
 import List.Zipper as Zipper exposing (Zipper)
 import Markdown
+import Process
 import Project exposing (Project)
 import Scene exposing (Scene)
 import Svg
 import Svg.Attributes
+import Task
 import Time
 import Todo
 import Zoom
@@ -36,6 +38,12 @@ main =
         }
 
 
+port goFullscreen : () -> Cmd msg
+
+
+port exitFullscreen : () -> Cmd msg
+
+
 type alias Model =
     { zoom : Int
     , currentFrame : Int
@@ -49,6 +57,9 @@ type alias Model =
 type State
     = Paused
     | Playing
+    | StartingFullscreen
+    | PlayingFullscreen
+    | EndingFullscreen
 
 
 type Msg
@@ -67,6 +78,7 @@ type Msg
     | HoverAt Int
     | HoverOff
     | JumpToFrameAtPx Int
+    | GoFullscreenAndPlay
 
 
 init : () -> ( Model, Cmd Msg )
@@ -89,15 +101,39 @@ view model =
         , E.width E.fill
         , E.height E.fill
         ]
-        (E.column
-            [ E.width E.fill
-            , E.height E.fill
-            , E.clip
-            ]
-            [ viewPreview model
-            , viewTimeline model
-            ]
+        (case model.state of
+            Paused ->
+                viewEdit model
+
+            Playing ->
+                viewEdit model
+
+            StartingFullscreen ->
+                viewFullscreen model
+
+            PlayingFullscreen ->
+                viewFullscreen model
+
+            EndingFullscreen ->
+                viewFullscreen model
         )
+
+
+viewFullscreen : Model -> Element Msg
+viewFullscreen model =
+    viewSceneForFrame model model.currentFrame
+
+
+viewEdit : Model -> Element Msg
+viewEdit model =
+    E.column
+        [ E.width E.fill
+        , E.height E.fill
+        , E.clip
+        ]
+        [ viewPreview model
+        , viewTimeline model
+        ]
 
 
 viewPreview :
@@ -378,6 +414,16 @@ viewTimelineControls { currentFrame, state, project } =
 
                     Playing ->
                         viewTimelineButton Pause FI.pause "Pause"
+
+                    StartingFullscreen ->
+                        E.none
+
+                    PlayingFullscreen ->
+                        E.none
+
+                    EndingFullscreen ->
+                        E.none
+                , viewTimelineButton GoFullscreenAndPlay FI.playCircle "Play from start in fullscreen"
                 , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
                 , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
                 , viewTimelineButton JumpToNext FI.skipForward "Jump to next action"
@@ -538,18 +584,49 @@ update msg model =
             )
 
         Play ->
-            ( { model | state = Playing }
+            ( { model
+                | state =
+                    case model.state of
+                        Paused ->
+                            Playing
+
+                        Playing ->
+                            Playing
+
+                        StartingFullscreen ->
+                            PlayingFullscreen
+
+                        PlayingFullscreen ->
+                            PlayingFullscreen
+
+                        EndingFullscreen ->
+                            Playing
+              }
             , Cmd.none
             )
 
         Pause ->
             ( { model | state = Paused }
-            , Cmd.none
+            , case model.state of
+                Playing ->
+                    Cmd.none
+
+                Paused ->
+                    Cmd.none
+
+                StartingFullscreen ->
+                    Cmd.none
+
+                PlayingFullscreen ->
+                    Cmd.none
+
+                EndingFullscreen ->
+                    exitFullscreen ()
             )
 
         Tick delta ->
-            case model.state of
-                Playing ->
+            let
+                play () =
                     let
                         delta_ =
                             delta + model.leftoverDelta
@@ -570,22 +647,62 @@ update msg model =
                             else
                                 delta_ - Time.frameToMs advancedFrames
 
-                        ( newCurrentFrame, newState ) =
+                        newCurrentFrame =
                             if hasEnded then
-                                ( model.project.endFrame, Paused )
+                                model.project.endFrame
 
                             else
-                                ( advancedCurrentFrame, Playing )
+                                advancedCurrentFrame
+
+                        ( newState, maybeExitFullscreenCmd ) =
+                            if hasEnded then
+                                case model.state of
+                                    Playing ->
+                                        ( Paused, Cmd.none )
+
+                                    PlayingFullscreen ->
+                                        ( EndingFullscreen
+                                        , Process.sleep 2000
+                                            |> Task.andThen (\() -> Task.succeed Pause)
+                                            |> Task.perform identity
+                                        )
+
+                                    Paused ->
+                                        ( Paused, Cmd.none )
+
+                                    StartingFullscreen ->
+                                        ( Paused, Cmd.none )
+
+                                    EndingFullscreen ->
+                                        ( Paused, Cmd.none )
+
+                            else
+                                ( model.state
+                                , Cmd.none
+                                )
                     in
                     ( { model
                         | leftoverDelta = newLeftoverDelta
                         , currentFrame = newCurrentFrame
                         , state = newState
                       }
-                    , Cmd.none
+                    , maybeExitFullscreenCmd
                     )
+            in
+            case model.state of
+                Playing ->
+                    play ()
 
                 Paused ->
+                    ( model, Cmd.none )
+
+                StartingFullscreen ->
+                    ( model, Cmd.none )
+
+                PlayingFullscreen ->
+                    play ()
+
+                EndingFullscreen ->
                     ( model, Cmd.none )
 
         HoverAt px ->
@@ -615,6 +732,19 @@ update msg model =
             in
             ( { model | currentFrame = frame }
             , Cmd.none
+            )
+
+        GoFullscreenAndPlay ->
+            ( { model
+                | currentFrame = 0
+                , state = StartingFullscreen
+              }
+            , Cmd.batch
+                [ goFullscreen ()
+                , Process.sleep 2000
+                    |> Task.andThen (\() -> Task.succeed Play)
+                    |> Task.perform identity
+                ]
             )
 
 
@@ -672,9 +802,22 @@ nextActionFrame currentFrame { actions } =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
+    let
+        listenForTick () =
+            Browser.Events.onAnimationFrameDelta Tick
+    in
     case model.state of
         Paused ->
             Sub.none
 
         Playing ->
-            Browser.Events.onAnimationFrameDelta Tick
+            listenForTick ()
+
+        StartingFullscreen ->
+            Sub.none
+
+        PlayingFullscreen ->
+            listenForTick ()
+
+        EndingFullscreen ->
+            Sub.none

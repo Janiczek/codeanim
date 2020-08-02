@@ -13,6 +13,16 @@
         <script src="./build/elm.js"></script>
         <script>
             var app = Elm.Main.init({node: window.elm});
+
+            app.ports.goFullscreen.subscribe(() => {
+                document.documentElement.requestFullscreen();
+                document.documentElement.style.cursor = 'none';
+            });
+
+            app.ports.exitFullscreen.subscribe(() => {
+                document.exitFullscreen();
+                document.documentElement.style.cursor = 'default';
+            });
         </script>
     </body>
 </html>
