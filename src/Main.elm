@@ -60,6 +60,7 @@ type State
     | StartingFullscreen
     | PlayingFullscreen
     | EndingFullscreen
+    | Rendering
 
 
 type Msg
@@ -79,6 +80,7 @@ type Msg
     | HoverOff
     | JumpToFrameAtPx Int
     | GoFullscreenAndPlay
+    | StartRendering
 
 
 init : () -> ( Model, Cmd Msg )
@@ -116,12 +118,20 @@ view model =
 
             EndingFullscreen ->
                 viewFullscreen model
+
+            Rendering ->
+                viewFullscreen model
         )
 
 
 viewFullscreen : Model -> Element Msg
 viewFullscreen model =
-    viewSceneForFrame model model.currentFrame
+    E.el
+        [ E.htmlAttribute (Html.Attributes.id "fullscreen-scene")
+        , E.width E.fill
+        , E.height E.fill
+        ]
+        (viewSceneForFrame model model.currentFrame)
 
 
 viewEdit : Model -> Element Msg
@@ -423,6 +433,9 @@ viewTimelineControls { currentFrame, state, project } =
 
                     EndingFullscreen ->
                         E.none
+
+                    Rendering ->
+                        E.none
                 , viewTimelineButton GoFullscreenAndPlay FI.playCircle "Play from start in fullscreen"
                 , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
                 , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
@@ -544,7 +557,38 @@ update msg model =
             )
 
         JumpForward n ->
-            ( { model | currentFrame = model.currentFrame + n }
+            let
+                newFrame =
+                    model.currentFrame + n
+
+                newState =
+                    case model.state of
+                        Paused ->
+                            model.state
+
+                        Playing ->
+                            model.state
+
+                        StartingFullscreen ->
+                            model.state
+
+                        PlayingFullscreen ->
+                            model.state
+
+                        EndingFullscreen ->
+                            model.state
+
+                        Rendering ->
+                            if newFrame > model.project.endFrame then
+                                Paused
+
+                            else
+                                model.state
+            in
+            ( { model
+                | currentFrame = newFrame
+                , state = newState
+              }
             , Cmd.none
             )
 
@@ -601,6 +645,9 @@ update msg model =
 
                         EndingFullscreen ->
                             Playing
+
+                        Rendering ->
+                            PlayingFullscreen
               }
             , Cmd.none
             )
@@ -622,6 +669,9 @@ update msg model =
 
                 EndingFullscreen ->
                     exitFullscreen ()
+
+                Rendering ->
+                    Cmd.none
             )
 
         Tick delta ->
@@ -676,6 +726,9 @@ update msg model =
                                     EndingFullscreen ->
                                         ( Paused, Cmd.none )
 
+                                    Rendering ->
+                                        ( Paused, Cmd.none )
+
                             else
                                 ( model.state
                                 , Cmd.none
@@ -703,6 +756,9 @@ update msg model =
                     play ()
 
                 EndingFullscreen ->
+                    ( model, Cmd.none )
+
+                Rendering ->
                     ( model, Cmd.none )
 
         HoverAt px ->
@@ -745,6 +801,14 @@ update msg model =
                     |> Task.andThen (\() -> Task.succeed Play)
                     |> Task.perform identity
                 ]
+            )
+
+        StartRendering ->
+            ( { model
+                | currentFrame = 0
+                , state = Rendering
+              }
+            , Cmd.none
             )
 
 
@@ -800,18 +864,37 @@ nextActionFrame currentFrame { actions } =
     go 0 actions
 
 
+onKeyPress : String -> Msg -> Decoder Msg
+onKeyPress key msg =
+    Json.Decode.field "key" Json.Decode.string
+        |> Json.Decode.andThen
+            (\string ->
+                if string == key then
+                    Json.Decode.succeed msg
+
+                else
+                    Json.Decode.fail "don't care"
+            )
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     let
         listenForTick () =
             Browser.Events.onAnimationFrameDelta Tick
+
+        listenForKey key msg =
+            Browser.Events.onKeyPress (onKeyPress key msg)
     in
     case model.state of
         Paused ->
-            Sub.none
+            listenForKey "r" StartRendering
 
         Playing ->
-            listenForTick ()
+            Sub.batch
+                [ listenForKey "r" StartRendering
+                , listenForTick ()
+                ]
 
         StartingFullscreen ->
             Sub.none
@@ -821,3 +904,6 @@ subscriptions model =
 
         EndingFullscreen ->
             Sub.none
+
+        Rendering ->
+            listenForKey " " (JumpForward 1)

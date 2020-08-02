@@ -1,2 +1,5 @@
 elm-stuff/
+node_modules/
 build/
+render*/
+error.png
