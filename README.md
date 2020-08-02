@@ -4,7 +4,6 @@ Click to see demo:
 [![Screenshot](https://github.com/Janiczek/codeanim/raw/master/doc/screenshot.png)](https://github.com/Janiczek/codeanim/raw/master/doc/screencast.mp4)
 
 TODO:
-* deploy to GitHub pages
 * UI buttons to add/delete/reorder/change duration of actions
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping
