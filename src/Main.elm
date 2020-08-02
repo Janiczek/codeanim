@@ -97,10 +97,14 @@ viewPreview model =
     E.el
         [ E.width E.fill
         , E.height E.fill
+        , E.htmlAttribute (Html.Attributes.style "max-width" "min(1200px, 80vw)")
+        , E.centerX
+        , E.centerY
         , E.padding 20
         ]
         (E.el
             [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
+            , E.centerY
             , E.htmlAttribute (Html.Attributes.style "position" "relative")
             , E.htmlAttribute (Html.Attributes.style "width" "100%")
             , E.htmlAttribute (Html.Attributes.style "height" "0")
@@ -114,15 +118,6 @@ viewPreview model =
             ]
             (viewRenderedScene model)
         )
-
-
-
---withAspectRatio : (Int, Int) -> Element Msg -> Element Msg
---withAspectRatio (w,h) el =
---    E.el
---    [ E.htmlAttribute (Html.Attributes.style "position" "relative")
---        ]
---    el
 
 
 viewRenderedScene :
