@@ -10,3 +10,4 @@ TODO:
 * Export to GIF/MP4/PNGs/... play in fullscreen mode / ...
 * Scrub by mouse-hovering
 * Jump to a specific frame by mouse-clicking
+* Hold button -> repeatedly apply the action (step / fast forward)
