@@ -8,3 +8,5 @@ TODO:
 * UI buttons to add/delete/reorder/change duration of actions
 * Better Prism CSS?
 * Export to GIF/MP4/PNGs/... play in fullscreen mode / ...
+* Scrub by mouse-hovering
+* Jump to a specific frame by mouse-clicking
