@@ -17,6 +17,8 @@ import List.Zipper as Zipper exposing (Zipper)
 import Markdown
 import Project exposing (Project)
 import Scene exposing (Scene)
+import Svg
+import Svg.Attributes
 import Time
 import Todo
 import Zoom
@@ -114,6 +116,15 @@ viewPreview model =
         )
 
 
+
+--withAspectRatio : (Int, Int) -> Element Msg -> Element Msg
+--withAspectRatio (w,h) el =
+--    E.el
+--    [ E.htmlAttribute (Html.Attributes.style "position" "relative")
+--        ]
+--    el
+
+
 viewRenderedScene :
     { a
         | currentFrame : Int
@@ -133,17 +144,32 @@ viewRenderedScene { currentFrame, project } =
         , E.htmlAttribute (Html.Attributes.style "height" "100%")
         , E.htmlAttribute (Html.Attributes.style "top" "0")
         , E.htmlAttribute (Html.Attributes.style "left" "0")
-        , E.padding 20
         ]
         (E.el
             [ E.alpha scene.opacity
+            , E.width E.fill
+            , E.height E.fill
             ]
             (E.html <|
-                Html.node "x-highlight"
-                    [ Html.Attributes.attribute "data-code" scene.text
-                    , Html.Attributes.style "font-size" "30px"
+                Svg.svg
+                    [ Svg.Attributes.width "100%"
+                    , Svg.Attributes.viewBox "0 0 1920 1080"
                     ]
-                    []
+                    [ Svg.foreignObject
+                        [ Svg.Attributes.width "100%"
+                        , Svg.Attributes.height "100%"
+
+                        -- holds 10 lines of text
+                        , Svg.Attributes.x "130"
+                        , Svg.Attributes.y "80"
+                        ]
+                        [ Html.node "x-highlight"
+                            [ Html.Attributes.attribute "data-code" scene.text
+                            , Html.Attributes.style "font-size" "60px"
+                            ]
+                            []
+                        ]
+                    ]
             )
         )
 
