@@ -93,14 +93,16 @@ viewPreview :
     -> Element Msg
 viewPreview model =
     E.el
-        [ E.height E.fill
-        , E.width E.fill
+        [ E.width E.fill
+        , E.height E.fill
         , E.padding 20
         ]
         (E.el
             [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
-            , E.height E.fill
-            , E.width E.fill
+            , E.htmlAttribute (Html.Attributes.style "position" "relative")
+            , E.htmlAttribute (Html.Attributes.style "width" "100%")
+            , E.htmlAttribute (Html.Attributes.style "height" "0")
+            , E.htmlAttribute (Html.Attributes.style "padding-top" "56.25%")
             , EBo.shadow
                 { offset = ( 1, 1 )
                 , size = 0
@@ -126,15 +128,21 @@ viewRenderedScene { currentFrame, project } =
     in
     E.el
         [ EBg.color project.codeBg
-        , E.width E.fill
-        , E.height E.fill
+        , E.htmlAttribute (Html.Attributes.style "position" "absolute")
+        , E.htmlAttribute (Html.Attributes.style "width" "100%")
+        , E.htmlAttribute (Html.Attributes.style "height" "100%")
+        , E.htmlAttribute (Html.Attributes.style "top" "0")
+        , E.htmlAttribute (Html.Attributes.style "left" "0")
         , E.padding 20
         ]
         (E.el
-            [ E.alpha scene.opacity ]
+            [ E.alpha scene.opacity
+            ]
             (E.html <|
                 Html.node "x-highlight"
-                    [ Html.Attributes.attribute "data-code" scene.text ]
+                    [ Html.Attributes.attribute "data-code" scene.text
+                    , Html.Attributes.style "font-size" "30px"
+                    ]
                     []
             )
         )
