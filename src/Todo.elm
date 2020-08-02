@@ -10,7 +10,7 @@ project : Project
 project =
     Project.init
         { actions = actions
-        , codeBg = E.rgb255 0x33 0x33 0x33
+        , codeBg = E.rgb255 0x21 0x27 0x33
         }
 
 

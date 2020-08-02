@@ -6,7 +6,6 @@ Click to see demo:
 TODO:
 * deploy to GitHub pages
 * UI buttons to add/delete/reorder/change duration of actions
-* Better Prism CSS?
 * Export to SVG/GIF/MP4/PNGs/... play in fullscreen mode / ...
     * [html2canvas](https://html2canvas.hertzen.com/)?
     * [dom-to-image](https://github.com/tsayen/dom-to-image)?
@@ -15,3 +14,4 @@ TODO:
 * Jump to a specific frame by mouse-clicking
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping
+* Audio track to play under the video?
