@@ -61,6 +61,7 @@ type Msg
     | Tick Float
     | HoverAt Int
     | HoverOff
+    | JumpToFrameAtPx Int
 
 
 init : () -> ( Model, Cmd Msg )
@@ -207,11 +208,6 @@ viewTimeline ({ currentFrame, zoom, project, playing, hoveringAtFrame } as model
         ]
         [ E.column
             [ E.inFront <|
-                viewFrameMarker
-                    model
-                    currentFrame
-                    (E.rgb255 0xFF 0x00 0x00)
-            , E.inFront <|
                 case hoveringAtFrame of
                     Just frame ->
                         viewFrameMarker
@@ -221,6 +217,11 @@ viewTimeline ({ currentFrame, zoom, project, playing, hoveringAtFrame } as model
 
                     Nothing ->
                         E.none
+            , E.inFront <|
+                viewFrameMarker
+                    model
+                    currentFrame
+                    (E.rgb255 0xFF 0x00 0x00)
             , E.width E.fill
             ]
             [ viewSecondsRuler model
@@ -305,6 +306,8 @@ viewActions ({ project } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
             |> E.mapAttribute HoverAt
+        , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
+            |> E.mapAttribute JumpToFrameAtPx
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
         ]
@@ -580,6 +583,18 @@ update msg model =
 
         HoverOff ->
             ( { model | hoveringAtFrame = Nothing }
+            , Cmd.none
+            )
+
+        JumpToFrameAtPx px ->
+            let
+                frame =
+                    Zoom.pxToFrame
+                        { px = px
+                        , zoom = model.zoom
+                        }
+            in
+            ( { model | currentFrame = frame }
             , Cmd.none
             )
 
