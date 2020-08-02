@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Action exposing (Action, RawAction)
 import Browser
+import Browser.Events
 import Config exposing (fps, fpsF)
 import Element as E exposing (Element)
 import Element.Background as EBg
@@ -35,6 +36,8 @@ type alias Model =
     { zoom : Int
     , currentFrame : Int
     , project : Project
+    , playing : Bool
+    , leftoverDelta : Float
     }
 
 
@@ -48,6 +51,9 @@ type Msg
     | JumpToNext
     | JumpToStart
     | JumpToEnd
+    | Play
+    | Pause
+    | Tick Float
 
 
 init : () -> ( Model, Cmd Msg )
@@ -55,6 +61,8 @@ init () =
     ( { zoom = 0
       , currentFrame = 0
       , project = Todo.project
+      , playing = False
+      , leftoverDelta = 0
       }
     , Cmd.none
     )
@@ -137,9 +145,10 @@ viewTimeline :
         | currentFrame : Int
         , zoom : Int
         , project : Project
+        , playing : Bool
     }
     -> Element Msg
-viewTimeline ({ currentFrame, zoom, project } as model) =
+viewTimeline ({ currentFrame, zoom, project, playing } as model) =
     E.column
         [ E.width E.fill
         , EBg.color (E.rgb255 0x50 0x50 0x50)
@@ -262,8 +271,13 @@ viewCurrentFrameMarker { currentFrame, zoom } =
         E.none
 
 
-viewTimelineControls : { a | currentFrame : Int } -> Element Msg
-viewTimelineControls { currentFrame } =
+viewTimelineControls :
+    { a
+        | currentFrame : Int
+        , playing : Bool
+    }
+    -> Element Msg
+viewTimelineControls { currentFrame, playing } =
     E.row
         [ E.spaceEvenly
         , E.width E.fill
@@ -282,6 +296,11 @@ viewTimelineControls { currentFrame } =
                 , viewTimelineButton JumpToPrevious FI.skipBack "Jump to previous action"
                 , viewTimelineButton (JumpBackward 10) FI.chevronsLeft "Jump backward (10f)"
                 , viewTimelineButton (JumpBackward 1) FI.chevronLeft "Step backward"
+                , if playing then
+                    viewTimelineButton Pause FI.pause "Pause"
+
+                  else
+                    viewTimelineButton Play FI.play "Play"
                 , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
                 , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
                 , viewTimelineButton JumpToNext FI.skipForward "Jump to next action"
@@ -435,6 +454,49 @@ update msg model =
             , Cmd.none
             )
 
+        Play ->
+            ( { model | playing = True }
+            , Cmd.none
+            )
+
+        Pause ->
+            ( { model | playing = False }
+            , Cmd.none
+            )
+
+        Tick delta ->
+            if model.playing then
+                let
+                    delta_ =
+                        delta + model.leftoverDelta
+
+                    advancedFrames =
+                        floor <| Time.msToFrame delta_
+
+                    newLeftoverDelta =
+                        delta_ - Time.frameToMs advancedFrames
+
+                    ideallyNewCurrentFrame =
+                        model.currentFrame + advancedFrames
+
+                    ( newCurrentFrame, newPlaying ) =
+                        if ideallyNewCurrentFrame >= model.project.totalFrames then
+                            ( model.project.totalFrames - 1, False )
+
+                        else
+                            ( ideallyNewCurrentFrame, True )
+                in
+                ( { model
+                    | leftoverDelta = newLeftoverDelta
+                    , currentFrame = newCurrentFrame
+                    , playing = newPlaying
+                  }
+                , Cmd.none
+                )
+
+            else
+                ( model, Cmd.none )
+
 
 previousActionFrame : Int -> Project -> Int
 previousActionFrame currentFrame { actions } =
@@ -490,4 +552,8 @@ nextActionFrame currentFrame { actions } =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    if model.playing then
+        Browser.Events.onAnimationFrameDelta Tick
+
+    else
+        Sub.none

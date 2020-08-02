@@ -18,10 +18,10 @@ actions : List RawAction
 actions =
     [ TypeText
         { text = "module Example exposing (example)\n\n\n"
-        , durationFrames = ceiling <| Time.msToFrame 1000
+        , durationFrames = ceiling <| Time.msToFrame 2000
         , position = Nothing
         }
-    , Wait { durationFrames = ceiling <| Time.msToFrame 3000 }
+    , Wait { durationFrames = ceiling <| Time.msToFrame 2000 }
     , TypeText
         { text = "import Minithesis\n"
         , durationFrames = ceiling <| Time.msToFrame 700
@@ -33,9 +33,9 @@ actions =
         , durationFrames = ceiling <| Time.msToFrame 700
         , position = Nothing
         }
-    , Wait { durationFrames = ceiling <| Time.msToFrame 1000 }
-    , FadeOut { durationFrames = ceiling <| Time.msToFrame 1000 }
     , Wait { durationFrames = ceiling <| Time.msToFrame 500 }
+    , FadeOut { durationFrames = ceiling <| Time.msToFrame 1000 }
+    , Wait { durationFrames = ceiling <| Time.msToFrame 1000 }
     , TypeText
         { text =
             """example : Minithesis.TestResult
