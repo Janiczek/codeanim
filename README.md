@@ -20,3 +20,6 @@ The first option is surprisingly readable, given it's 330 kb/s.
 The third option (that is, first ultrafast CRF=0 then veryslow CRF=0 as a second
 pass) looks like the best guarantee of real lossless output. And there seem to
 be no frame drops.
+
+Note: On FFMPEG wiki I found out I should use `libx264rgb` instead of `libx264`,
+so that it doesn't convert lossily to a different colorspace.
