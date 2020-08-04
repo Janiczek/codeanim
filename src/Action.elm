@@ -13,6 +13,7 @@ module Action exposing
 
 import Element as E
 import Format
+import List.Extra
 
 
 bgColor : RawAction -> E.Color
@@ -46,6 +47,7 @@ type alias Action =
     { raw : RawAction
     , startFrame : Int
     , endFrame : Int
+    , index : Int
     }
 
 
@@ -139,8 +141,8 @@ tooltip action =
 
 process : List RawAction -> ( Int, List Action )
 process actions =
-    List.foldl
-        (\action ( accFrames, accActions ) ->
+    List.Extra.indexedFoldl
+        (\index action ( accFrames, accActions ) ->
             let
                 nextActionStartFrame =
                     accFrames + durationFrames action
@@ -149,6 +151,7 @@ process actions =
             , { raw = action
               , startFrame = accFrames
               , endFrame = nextActionStartFrame - 1
+              , index = index
               }
                 :: accActions
             )

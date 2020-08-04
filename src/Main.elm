@@ -15,6 +15,7 @@ import Html exposing (Html)
 import Html.Attributes
 import Html.Events
 import Json.Decode exposing (Decoder)
+import List.Extra
 import List.Zipper as Zipper exposing (Zipper)
 import Markdown
 import Process
@@ -78,12 +79,13 @@ type Msg
     | Play
     | Pause
     | Tick Float
-    | HoverAt Int
+    | HoverAtPx Int
     | HoverOff
     | JumpToFrameAtPx Int
     | GoFullscreenAndPlay
     | StartRendering
     | AddAction RawAction
+    | RemoveActionAtIndex Int
 
 
 init : () -> ( Model, Cmd Msg )
@@ -359,18 +361,19 @@ viewActions :
     { a
         | project : Project
         , zoom : Int
+        , hoveringAtFrame : Maybe Int
     }
     -> Element Msg
 viewActions ({ project } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
-            |> E.mapAttribute HoverAt
+            |> E.mapAttribute HoverAtPx
         , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
             |> E.mapAttribute JumpToFrameAtPx
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
         ]
-        (List.map (viewAction model) project.actions)
+        (List.indexedMap (viewAction model) project.actions)
 
 
 viewFrameMarker :
@@ -542,11 +545,26 @@ viewButton msg icon tooltip =
         }
 
 
-viewAction : { a | zoom : Int } -> Action -> Element Msg
-viewAction { zoom } action =
+viewAction :
+    { a
+        | zoom : Int
+        , hoveringAtFrame : Maybe Int
+        , project : Project
+    }
+    -> Int
+    -> Action
+    -> Element Msg
+viewAction { zoom, hoveringAtFrame, project } index action =
     let
         color =
             Action.bgColor action.raw
+
+        hoveringThisAction : Bool
+        hoveringThisAction =
+            hoveringAtFrame
+                |> Maybe.andThen (actionIndexForFrame project)
+                |> Maybe.map ((==) index)
+                |> Maybe.withDefault False
     in
     E.el
         [ EBg.color color
@@ -559,13 +577,27 @@ viewAction { zoom } action =
                     }
                 )
             )
-        , E.clip
         , EBo.width 2
         , EBo.color (darken 0.1 color)
         , EBo.rounded 4
         , EF.color (darken 0.3 color)
         , EF.size 14
         , E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
+        , E.inFront
+            (if hoveringThisAction then
+                EI.button
+                    [ E.padding 2
+                    , EF.color (E.rgb255 0xFF 0xFF 0xFF)
+                    , EF.center
+                    , E.alignRight
+                    ]
+                    { onPress = Just (RemoveActionAtIndex index)
+                    , label = E.html (FI.toHtml [] FI.x)
+                    }
+
+             else
+                E.none
+            )
         ]
         (viewActionText action.raw)
 
@@ -592,14 +624,20 @@ darken amount color =
 viewActionText : RawAction -> Element Msg
 viewActionText action =
     E.el
-        [ E.paddingEach
-            { left = 5
-            , top = 5
-            , bottom = 0
-            , right = 0
-            }
+        [ E.clip
+        , E.width E.fill
+        , E.height E.fill
         ]
-        (E.text (Action.label action))
+        (E.el
+            [ E.paddingEach
+                { left = 5
+                , top = 5
+                , bottom = 0
+                , right = 0
+                }
+            ]
+            (E.text (Action.label action))
+        )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -825,7 +863,7 @@ update msg model =
                 Rendering ->
                     ( model, Cmd.none )
 
-        HoverAt px ->
+        HoverAtPx px ->
             let
                 frame =
                     Zoom.pxToFrame
@@ -898,6 +936,32 @@ update msg model =
             , Cmd.none
             )
 
+        RemoveActionAtIndex index ->
+            let
+                project =
+                    model.project
+
+                rawActions =
+                    project.actions
+                        |> List.map .raw
+
+                newRawActions =
+                    List.take index rawActions
+                        ++ List.drop (index + 1) rawActions
+
+                ( newTotalFrames, newActions ) =
+                    Action.process newRawActions
+            in
+            ( { model
+                | project =
+                    { project
+                        | actions = newActions
+                        , totalFrames = newTotalFrames
+                    }
+              }
+            , Cmd.none
+            )
+
 
 previousActionFrame : Int -> Project -> Int
 previousActionFrame currentFrame { actions } =
@@ -949,6 +1013,14 @@ nextActionFrame currentFrame { actions } =
                         go newAccFrame rest
     in
     go 0 actions
+
+
+actionIndexForFrame : Project -> Int -> Maybe Int
+actionIndexForFrame project frame =
+    List.Extra.find
+        (\action -> action.endFrame >= frame)
+        project.actions
+        |> Maybe.map .index
 
 
 onKeyPress : String -> Msg -> Decoder Msg
