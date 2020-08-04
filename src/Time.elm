@@ -1,5 +1,6 @@
 module Time exposing
     ( frameToMs
+    , ms
     , msToFrame
     , percentage
     )
@@ -8,8 +9,13 @@ import Config exposing (fpsF)
 
 
 msToFrame : Float -> Float
-msToFrame ms =
-    ms * fpsF / 1000
+msToFrame ms_ =
+    ms_ * fpsF / 1000
+
+
+ms : Int -> Int
+ms ms_ =
+    ceiling <| msToFrame (toFloat ms_)
 
 
 frameToMs : Int -> Float

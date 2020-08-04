@@ -1,6 +1,6 @@
 port module Main exposing (main)
 
-import Action exposing (Action, RawAction)
+import Action exposing (Action, RawAction(..))
 import Browser
 import Browser.Events
 import Config exposing (fps, fpsF)
@@ -83,6 +83,7 @@ type Msg
     | JumpToFrameAtPx Int
     | GoFullscreenAndPlay
     | StartRendering
+    | AddAction RawAction
 
 
 init : () -> ( Model, Cmd Msg )
@@ -285,6 +286,7 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) 
             , viewActions model
             ]
         , viewTimelineControls model
+        , viewAddButtons
         ]
 
 
@@ -416,16 +418,16 @@ viewTimelineControls { currentFrame, state, project } =
         ]
         [ E.el []
             (E.row [ E.spacing 2 ]
-                [ viewTimelineButton JumpToStart FI.cornerLeftDown "Jump to start"
-                , viewTimelineButton JumpToPrevious FI.skipBack "Jump to previous action"
-                , viewTimelineButton (JumpBackward 10) FI.chevronsLeft "Jump backward (10f)"
-                , viewTimelineButton (JumpBackward 1) FI.chevronLeft "Step backward"
+                [ viewButton JumpToStart FI.cornerLeftDown "Jump to start"
+                , viewButton JumpToPrevious FI.skipBack "Jump to previous action"
+                , viewButton (JumpBackward 10) FI.chevronsLeft "Jump backward (10f)"
+                , viewButton (JumpBackward 1) FI.chevronLeft "Step backward"
                 , case state of
                     Paused ->
-                        viewTimelineButton Play FI.play "Play"
+                        viewButton Play FI.play "Play"
 
                     Playing ->
-                        viewTimelineButton Pause FI.pause "Pause"
+                        viewButton Pause FI.pause "Pause"
 
                     StartingFullscreen ->
                         E.none
@@ -438,11 +440,11 @@ viewTimelineControls { currentFrame, state, project } =
 
                     Rendering ->
                         E.none
-                , viewTimelineButton GoFullscreenAndPlay FI.playCircle "Play from start in fullscreen"
-                , viewTimelineButton (JumpForward 1) FI.chevronRight "Step forward"
-                , viewTimelineButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
-                , viewTimelineButton JumpToNext FI.skipForward "Jump to next action"
-                , viewTimelineButton JumpToEnd FI.cornerRightDown "Jump to end"
+                , viewButton GoFullscreenAndPlay FI.playCircle "Play from start in fullscreen"
+                , viewButton (JumpForward 1) FI.chevronRight "Step forward"
+                , viewButton (JumpForward 10) FI.chevronsRight "Jump forward (10f)"
+                , viewButton JumpToNext FI.skipForward "Jump to next action"
+                , viewButton JumpToEnd FI.cornerRightDown "Jump to end"
                 ]
             )
         , E.el
@@ -458,16 +460,76 @@ viewTimelineControls { currentFrame, state, project } =
             )
         , E.el []
             (E.row [ E.spacing 2 ]
-                [ viewTimelineButton ZoomOut FI.zoomOut "Zoom out"
-                , viewTimelineButton ResetZoom FI.monitor "Reset zoom"
-                , viewTimelineButton ZoomIn FI.zoomIn "Zoom in"
+                [ viewButton ZoomOut FI.zoomOut "Zoom out"
+                , viewButton ResetZoom FI.monitor "Reset zoom"
+                , viewButton ZoomIn FI.zoomIn "Zoom in"
                 ]
             )
         ]
 
 
-viewTimelineButton : Msg -> Icon -> String -> Element Msg
-viewTimelineButton msg icon tooltip =
+viewAddButtons : Element Msg
+viewAddButtons =
+    E.row
+        [ E.spaceEvenly
+        , E.width E.fill
+        , E.height E.fill
+        , EBo.widthEach
+            { top = 1
+            , bottom = 0
+            , left = 0
+            , right = 0
+            }
+        , EBo.color (E.rgb255 0x33 0x33 0x33)
+        ]
+        [ {- E.el []
+             (
+          -}
+          E.row [ E.spacing 2 ]
+            [ viewButton
+                (AddAction
+                    (TypeText
+                        { text = "Text"
+                        , durationFrames = Time.ms 2000
+                        , position = Nothing
+                        }
+                    )
+                )
+                FI.type_
+                "Add 'Type' action"
+            , viewButton
+                (AddAction
+                    (Wait
+                        { durationFrames = Time.ms 1000 }
+                    )
+                )
+                FI.watch
+                "Add 'Wait' action"
+            , viewButton
+                (AddAction
+                    (FadeOutAndBlank
+                        { durationFrames = Time.ms 1000 }
+                    )
+                )
+                FI.loader
+                -- FI.minimize
+                "Add 'Fade out' action"
+            , viewButton
+                (AddAction BlankText)
+                FI.square
+                "Add 'Blank' action"
+            , viewButton
+                (AddAction (SetText "Text"))
+                FI.alignLeft
+                "Add 'Set Text' action"
+            ]
+
+        -- )
+        ]
+
+
+viewButton : Msg -> Icon -> String -> Element Msg
+viewButton msg icon tooltip =
     EI.button
         [ E.padding 5
         , EBg.color (E.rgb255 0xDD 0xDD 0xCC)
@@ -809,6 +871,29 @@ update msg model =
             ( { model
                 | currentFrame = 0
                 , state = Rendering
+              }
+            , Cmd.none
+            )
+
+        AddAction rawAction ->
+            let
+                project =
+                    model.project
+
+                rawActions =
+                    project.actions
+                        |> List.map .raw
+
+                ( newTotalFrames, newActions ) =
+                    (rawActions ++ [ rawAction ])
+                        |> Action.process
+            in
+            ( { model
+                | project =
+                    { project
+                        | totalFrames = newTotalFrames
+                        , actions = newActions
+                    }
               }
             , Cmd.none
             )

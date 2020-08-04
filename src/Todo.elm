@@ -3,7 +3,7 @@ module Todo exposing (project)
 import Action exposing (RawAction(..))
 import Element as E
 import Project exposing (Project)
-import Time
+import Time exposing (ms)
 
 
 project : Project
@@ -12,11 +12,6 @@ project =
         { actions = actions
         , codeBg = E.rgb255 0x21 0x27 0x33
         }
-
-
-ms : Int -> Int
-ms ms_ =
-    ceiling <| Time.msToFrame (toFloat ms_)
 
 
 actions : List RawAction
