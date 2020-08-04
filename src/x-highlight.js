@@ -6,7 +6,7 @@ xtag.create('x-highlight', class extends XTagElement {
 
   '::template(true)' () {
     const html = Prism.highlight(this.code, Prism.languages['elm'], 'elm');
-    return `<pre class="language-elm"><code class="language-elm">${html}</code></pre>`;
+    return `<pre class="language-elm" style="overflow: hidden;"><code class="language-elm">${html}</code></pre>`;
   }
 
   set 'data-code::attr' (code) {
