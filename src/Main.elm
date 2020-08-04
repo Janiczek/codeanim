@@ -199,16 +199,8 @@ viewModal modal =
             )
         ]
         (E.column
-            [ E.width
-                (E.shrink
-                    |> E.minimum 400
-                    |> E.maximum 600
-                )
-            , E.height
-                (E.shrink
-                    |> E.minimum 400
-                    |> E.maximum 600
-                )
+            [ E.width (E.px 600)
+            , E.height (E.px 600)
             , E.padding 20
             , EBg.color (E.rgb255 0x90 0x90 0x90)
             , E.spacing 20
