@@ -133,6 +133,14 @@ computeFrom frame endFrame currentAction restOfActions accScene =
 advanceTypeText : TypeTextOptions -> Int -> Action -> Scene -> Scene
 advanceTypeText { text, durationFrames, position } frame currentAction scene =
     let
+        _ =
+            case position of
+                Nothing ->
+                    ()
+
+                Just _ ->
+                    Debug.todo "Handle position!"
+
         previousLength : Int
         previousLength =
             charsWritten
