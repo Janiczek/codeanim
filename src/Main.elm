@@ -46,6 +46,8 @@ port exitFullscreen : () -> Cmd msg
 
 type alias Model =
     { zoom : Int
+
+    -- TODO , currentScene : Scene -> use `Scene.advance` later when possible
     , currentFrame : Int
     , project : Project
     , state : State
