@@ -7,6 +7,7 @@ import Config exposing (fps, fpsF)
 import Element as E exposing (Element)
 import Element.Background as EBg
 import Element.Border as EBo
+import Element.Events as EE
 import Element.Font as EF
 import Element.Input as EI
 import FeatherIcons as FI exposing (Icon)
@@ -54,7 +55,28 @@ type alias Model =
     , state : State
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
+    , modal : Maybe Modal
     }
+
+
+type Modal
+    = EditTypeText
+        { index : Int
+        , text : String
+        , duration : String
+        }
+    | EditWait
+        { index : Int
+        , duration : String
+        }
+    | EditFadeOut
+        { index : Int
+        , duration : String
+        }
+    | EditSetText
+        { index : Int
+        , text : String
+        }
 
 
 type State
@@ -86,6 +108,12 @@ type Msg
     | StartRendering
     | AddAction RawAction
     | RemoveActionAtIndex Int
+    | OpenModal Modal
+    | CloseModal
+    | SetModalText String
+    | SetModalDuration String
+    | SaveModal
+    | NoOp
 
 
 init : () -> ( Model, Cmd Msg )
@@ -96,6 +124,7 @@ init () =
       , state = Paused
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
+      , modal = Nothing
       }
     , Cmd.none
     )
@@ -107,6 +136,7 @@ view model =
         [ EBg.color (E.rgb255 0x70 0x70 0x70)
         , E.width E.fill
         , E.height E.fill
+        , EE.onClick CloseModal
         ]
         (case model.state of
             Paused ->
@@ -145,10 +175,157 @@ viewEdit model =
         [ E.width E.fill
         , E.height E.fill
         , E.clip
+        , E.inFront <|
+            case model.modal of
+                Nothing ->
+                    E.none
+
+                Just modal ->
+                    viewModal modal
         ]
         [ viewPreview model
         , viewTimeline model
         ]
+
+
+viewModal : Modal -> Element Msg
+viewModal modal =
+    E.el
+        [ E.centerX
+        , E.centerY
+        , E.htmlAttribute
+            (Html.Events.stopPropagationOn "click"
+                (Json.Decode.succeed ( NoOp, True ))
+            )
+        ]
+        (E.column
+            [ E.width
+                (E.shrink
+                    |> E.minimum 400
+                    |> E.maximum 600
+                )
+            , E.height
+                (E.shrink
+                    |> E.minimum 400
+                    |> E.maximum 600
+                )
+            , E.padding 20
+            , EBg.color (E.rgb255 0x90 0x90 0x90)
+            , E.spacing 20
+            ]
+            (viewModalContents modal
+                ++ [ E.row
+                        [ E.spaceEvenly
+                        , E.width E.fill
+                        ]
+                        [ EI.button
+                            [ E.padding 20
+                            , EBg.color (E.rgb255 0x90 0xB0 0x90)
+                            , EBo.width 2
+                            , EBo.color (E.rgb255 0x70 0x90 0x70)
+                            ]
+                            { onPress = Just SaveModal
+                            , label =
+                                E.el
+                                    [ E.centerX
+                                    , E.centerY
+                                    ]
+                                    (E.text "Save")
+                            }
+                        , EI.button
+                            [ E.padding 20
+                            , EBg.color (E.rgb255 0xB0 0x90 0x90)
+                            , EBo.width 2
+                            , EBo.color (E.rgb255 0x90 0x70 0x70)
+                            ]
+                            { onPress = Just CloseModal
+                            , label =
+                                E.el
+                                    [ E.centerX
+                                    , E.centerY
+                                    ]
+                                    (E.text "Cancel")
+                            }
+                        ]
+                   ]
+            )
+        )
+
+
+viewModalContents : Modal -> List (Element Msg)
+viewModalContents modal =
+    case modal of
+        EditTypeText { index, text, duration } ->
+            [ viewModalHeading "Type Text"
+            , EI.multiline
+                []
+                { onChange = SetModalText
+                , text = text
+                , placeholder = Nothing
+                , spellcheck = False
+                , label =
+                    EI.labelAbove []
+                        (E.text "Text")
+                }
+            , EI.text
+                []
+                { onChange = SetModalDuration
+                , text = duration
+                , placeholder = Nothing
+                , label =
+                    EI.labelAbove []
+                        (E.text "Duration (ms)")
+                }
+            ]
+
+        EditWait { index, duration } ->
+            [ viewModalHeading "Wait"
+            , EI.text
+                []
+                { onChange = SetModalDuration
+                , text = duration
+                , placeholder = Nothing
+                , label =
+                    EI.labelAbove []
+                        (E.text "Duration (ms)")
+                }
+            ]
+
+        EditFadeOut { index, duration } ->
+            [ viewModalHeading "Fade Out"
+            , EI.text
+                []
+                { onChange = SetModalDuration
+                , text = duration
+                , placeholder = Nothing
+                , label =
+                    EI.labelAbove []
+                        (E.text "Duration (ms)")
+                }
+            ]
+
+        EditSetText { index, text } ->
+            [ viewModalHeading "Set Text"
+            , EI.multiline
+                []
+                { onChange = SetModalText
+                , text = text
+                , placeholder = Nothing
+                , spellcheck = False
+                , label =
+                    EI.labelAbove []
+                        (E.text "Text")
+                }
+            ]
+
+
+viewModalHeading : String -> Element Msg
+viewModalHeading heading =
+    E.el
+        [ EF.size 30
+        , EF.bold
+        ]
+        (E.text heading)
 
 
 viewPreview :
@@ -522,7 +699,7 @@ viewAddButtons =
                 FI.square
                 "Add 'Blank' action"
             , viewButton
-                (AddAction (SetText "Text"))
+                (AddAction (SetText { text = "Text" }))
                 FI.alignLeft
                 "Add 'Set Text' action"
             ]
@@ -565,6 +742,41 @@ viewAction { zoom, hoveringAtFrame, project } index action =
                 |> Maybe.andThen (actionIndexForFrame project)
                 |> Maybe.map ((==) index)
                 |> Maybe.withDefault False
+
+        modal : Maybe Modal
+        modal =
+            case action.raw of
+                TypeText { text, durationFrames } ->
+                    Just <|
+                        EditTypeText
+                            { index = index
+                            , text = text
+                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                            }
+
+                Wait { durationFrames } ->
+                    Just <|
+                        EditWait
+                            { index = index
+                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                            }
+
+                FadeOutAndBlank { durationFrames } ->
+                    Just <|
+                        EditFadeOut
+                            { index = index
+                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                            }
+
+                BlankText ->
+                    Nothing
+
+                SetText { text } ->
+                    Just <|
+                        EditSetText
+                            { index = index
+                            , text = text
+                            }
     in
     E.el
         [ EBg.color color
@@ -582,6 +794,12 @@ viewAction { zoom, hoveringAtFrame, project } index action =
         , EBo.rounded 4
         , EF.color (darken 0.3 color)
         , EF.size 14
+        , case modal of
+            Nothing ->
+                emptyAttr
+
+            Just modal_ ->
+                EE.onDoubleClick (OpenModal modal_)
         , E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
         , E.inFront
             (if hoveringThisAction then
@@ -627,6 +845,7 @@ viewActionText action =
         [ E.clip
         , E.width E.fill
         , E.height E.fill
+        , E.htmlAttribute (Html.Attributes.style "user-select" "none")
         ]
         (E.el
             [ E.paddingEach
@@ -945,6 +1164,194 @@ update msg model =
             , Cmd.none
             )
 
+        OpenModal modal ->
+            ( { model | modal = Just modal }
+            , Cmd.none
+            )
+
+        CloseModal ->
+            ( { model | modal = Nothing }
+            , Cmd.none
+            )
+
+        SetModalText text ->
+            ( { model
+                | modal =
+                    model.modal
+                        |> Maybe.map (\modal -> setModalText text modal)
+              }
+            , Cmd.none
+            )
+
+        SetModalDuration duration ->
+            ( { model
+                | modal =
+                    model.modal
+                        |> Maybe.map (\modal -> setModalDuration duration modal)
+              }
+            , Cmd.none
+            )
+
+        SaveModal ->
+            case model.modal of
+                Nothing ->
+                    ( model, Cmd.none )
+
+                Just (EditTypeText r) ->
+                    String.toInt r.duration
+                        |> Maybe.map
+                            (\durationMs ->
+                                let
+                                    duration =
+                                        Time.ms durationMs
+
+                                    newAction =
+                                        TypeText
+                                            { text = r.text
+                                            , durationFrames = duration
+                                            , position = Nothing
+                                            }
+
+                                    newActions =
+                                        model.project.actions
+                                            |> List.map .raw
+                                            |> List.Extra.setAt r.index newAction
+
+                                    newProject =
+                                        model.project
+                                            |> Project.withActions newActions
+                                in
+                                ( { model
+                                    | modal = Nothing
+                                    , project = newProject
+                                  }
+                                , Cmd.none
+                                )
+                            )
+                        |> Maybe.withDefault ( model, Cmd.none )
+
+                Just (EditWait r) ->
+                    String.toInt r.duration
+                        |> Maybe.map
+                            (\durationMs ->
+                                let
+                                    duration =
+                                        Time.ms durationMs
+
+                                    newAction =
+                                        Wait
+                                            { durationFrames = duration }
+
+                                    newActions =
+                                        model.project.actions
+                                            |> List.map .raw
+                                            |> List.Extra.setAt r.index newAction
+
+                                    newProject =
+                                        model.project
+                                            |> Project.withActions newActions
+                                in
+                                ( { model
+                                    | modal = Nothing
+                                    , project = newProject
+                                  }
+                                , Cmd.none
+                                )
+                            )
+                        |> Maybe.withDefault ( model, Cmd.none )
+
+                Just (EditFadeOut r) ->
+                    String.toInt r.duration
+                        |> Maybe.map
+                            (\durationMs ->
+                                let
+                                    duration =
+                                        Time.ms durationMs
+
+                                    newAction =
+                                        FadeOutAndBlank
+                                            { durationFrames = duration }
+
+                                    newActions =
+                                        model.project.actions
+                                            |> List.map .raw
+                                            |> List.Extra.setAt r.index newAction
+
+                                    newProject =
+                                        model.project
+                                            |> Project.withActions newActions
+                                in
+                                ( { model
+                                    | modal = Nothing
+                                    , project = newProject
+                                  }
+                                , Cmd.none
+                                )
+                            )
+                        |> Maybe.withDefault ( model, Cmd.none )
+
+                Just (EditSetText r) ->
+                    let
+                        newAction =
+                            SetText
+                                { text = r.text }
+
+                        newActions =
+                            model.project.actions
+                                |> List.map .raw
+                                |> List.Extra.setAt r.index newAction
+
+                        newProject =
+                            model.project
+                                |> Project.withActions newActions
+                    in
+                    ( { model
+                        | modal = Nothing
+                        , project = newProject
+                      }
+                    , Cmd.none
+                    )
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+setModalText : String -> Modal -> Modal
+setModalText text modal =
+    case modal of
+        EditTypeText r ->
+            EditTypeText
+                { r | text = text }
+
+        EditSetText r ->
+            EditSetText
+                { r | text = text }
+
+        EditWait _ ->
+            modal
+
+        EditFadeOut _ ->
+            modal
+
+
+setModalDuration : String -> Modal -> Modal
+setModalDuration duration modal =
+    case modal of
+        EditTypeText r ->
+            EditTypeText
+                { r | duration = duration }
+
+        EditSetText _ ->
+            modal
+
+        EditWait r ->
+            EditWait
+                { r | duration = duration }
+
+        EditFadeOut r ->
+            EditFadeOut
+                { r | duration = duration }
+
 
 previousActionFrame : Int -> Project -> Int
 previousActionFrame currentFrame { actions } =
@@ -1031,15 +1438,27 @@ subscriptions model =
     case model.state of
         Paused ->
             Sub.batch
-                [ listenForKey "r" StartRendering
-                , listenForKey " " Play
+                [ if model.modal == Nothing then
+                    Sub.batch
+                        [ listenForKey " " Play
+                        , listenForKey "r" StartRendering
+                        ]
+
+                  else
+                    Sub.none
                 ]
 
         Playing ->
             Sub.batch
-                [ listenForKey "r" StartRendering
-                , listenForTick ()
-                , listenForKey " " Pause
+                [ listenForTick ()
+                , if model.modal == Nothing then
+                    Sub.batch
+                        [ listenForKey " " Play
+                        , listenForKey "r" StartRendering
+                        ]
+
+                  else
+                    Sub.none
                 ]
 
         StartingFullscreen ->
@@ -1056,3 +1475,8 @@ subscriptions model =
 
         Rendering ->
             listenForKey " " (JumpForward 1)
+
+
+emptyAttr : E.Attribute msg
+emptyAttr =
+    E.htmlAttribute (Html.Attributes.classList [])

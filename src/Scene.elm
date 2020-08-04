@@ -124,7 +124,7 @@ computeFrom frame endFrame currentAction restOfActions accScene =
                     BlankText ->
                         { accScene | text = "" }
 
-                    SetText text ->
+                    SetText { text } ->
                         { accScene | text = text }
         in
         computeFrom (frame + 1) endFrame currentAction restOfActions advancedScene

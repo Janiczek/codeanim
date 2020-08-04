@@ -60,7 +60,7 @@ example =
     , Wait
         { durationFrames = ms 300 }
     , SetText
-        "-- this text has been set without the typewriter effect\n\n\n"
+        { text = "-- this text has been set without the typewriter effect\n\n\n" }
     , Wait
         { durationFrames = ms 300 }
     , TypeText

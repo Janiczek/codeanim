@@ -2,6 +2,7 @@ module Action exposing
     ( Action
     , FadeOutOptions
     , RawAction(..)
+    , SetTextOptions
     , TypeTextOptions
     , WaitOptions
     , bgColor
@@ -38,7 +39,7 @@ type RawAction
     | Wait WaitOptions
     | FadeOutAndBlank FadeOutOptions
     | BlankText
-    | SetText String
+    | SetText SetTextOptions
 
 
 type alias Action =
@@ -62,6 +63,10 @@ type alias WaitOptions =
 
 type alias FadeOutOptions =
     { durationFrames : Int }
+
+
+type alias SetTextOptions =
+    { text : String }
 
 
 durationFrames : RawAction -> Int
@@ -133,5 +138,5 @@ tooltip action =
         BlankText ->
             "Blank text"
 
-        SetText text ->
+        SetText { text } ->
             "Set text: " ++ snippet text

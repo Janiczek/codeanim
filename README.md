@@ -5,7 +5,6 @@ Click to see demo:
 
 TODO:
 * UI buttons to reorder (`dnd` and `dnd-vendored` branches) actions
-* UI buttons to change duration and content of actions
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping
 * Audio track to play under the video?
