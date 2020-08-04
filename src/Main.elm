@@ -764,10 +764,10 @@ update msg model =
                     Cmd.none
 
                 StartingFullscreen ->
-                    Cmd.none
+                    exitFullscreen ()
 
                 PlayingFullscreen ->
-                    Cmd.none
+                    exitFullscreen ()
 
                 EndingFullscreen ->
                     exitFullscreen ()
@@ -915,50 +915,33 @@ update msg model =
 
         AddAction rawAction ->
             let
-                project =
-                    model.project
-
                 rawActions =
-                    project.actions
+                    model.project.actions
                         |> List.map .raw
 
-                ( newTotalFrames, newActions ) =
-                    (rawActions ++ [ rawAction ])
-                        |> Action.process
+                newProject =
+                    model.project
+                        |> Project.withActions (rawActions ++ [ rawAction ])
             in
-            ( { model
-                | project =
-                    { project
-                        | totalFrames = newTotalFrames
-                        , actions = newActions
-                    }
-              }
+            ( { model | project = newProject }
             , Cmd.none
             )
 
         RemoveActionAtIndex index ->
             let
-                project =
-                    model.project
-
                 rawActions =
-                    project.actions
+                    model.project.actions
                         |> List.map .raw
 
                 newRawActions =
                     List.take index rawActions
                         ++ List.drop (index + 1) rawActions
 
-                ( newTotalFrames, newActions ) =
-                    Action.process newRawActions
+                newProject =
+                    model.project
+                        |> Project.withActions newRawActions
             in
-            ( { model
-                | project =
-                    { project
-                        | actions = newActions
-                        , totalFrames = newTotalFrames
-                    }
-              }
+            ( { model | project = newProject }
             , Cmd.none
             )
 
@@ -1047,22 +1030,29 @@ subscriptions model =
     in
     case model.state of
         Paused ->
-            listenForKey "r" StartRendering
+            Sub.batch
+                [ listenForKey "r" StartRendering
+                , listenForKey " " Play
+                ]
 
         Playing ->
             Sub.batch
                 [ listenForKey "r" StartRendering
                 , listenForTick ()
+                , listenForKey " " Pause
                 ]
 
         StartingFullscreen ->
-            Sub.none
+            listenForKey " " Pause
 
         PlayingFullscreen ->
-            listenForTick ()
+            Sub.batch
+                [ listenForTick ()
+                , listenForKey " " Pause
+                ]
 
         EndingFullscreen ->
-            Sub.none
+            listenForKey " " Pause
 
         Rendering ->
             listenForKey " " (JumpForward 1)

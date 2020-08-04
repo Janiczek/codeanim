@@ -7,13 +7,11 @@ module Action exposing
     , bgColor
     , durationFrames
     , label
-    , process
     , tooltip
     )
 
 import Element as E
 import Format
-import List.Extra
 
 
 bgColor : RawAction -> E.Color
@@ -137,25 +135,3 @@ tooltip action =
 
         SetText text ->
             "Set text: " ++ snippet text
-
-
-process : List RawAction -> ( Int, List Action )
-process actions =
-    List.Extra.indexedFoldl
-        (\index action ( accFrames, accActions ) ->
-            let
-                nextActionStartFrame =
-                    accFrames + durationFrames action
-            in
-            ( nextActionStartFrame
-            , { raw = action
-              , startFrame = accFrames
-              , endFrame = nextActionStartFrame - 1
-              , index = index
-              }
-                :: accActions
-            )
-        )
-        ( 0, [] )
-        actions
-        |> Tuple.mapSecond List.reverse
