@@ -4,7 +4,6 @@ Click to see demo:
 [![Screenshot](https://github.com/Janiczek/codeanim/raw/master/doc/screenshot.png)](https://github.com/Janiczek/codeanim/raw/master/doc/screencast.mp4)
 
 TODO:
-* UI buttons to reorder (`dnd` and `dnd-vendored` branches) actions
 * Hold button -> repeatedly apply the action (step / fast forward)
 * Scroll the timeline when jumping
 * Audio track to play under the video?

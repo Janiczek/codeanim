@@ -4,6 +4,7 @@ import Action exposing (Action, RawAction(..))
 import Browser
 import Browser.Events
 import Config exposing (fps, fpsF)
+import DnDList
 import Element as E exposing (Element)
 import Element.Background as EBg
 import Element.Border as EBo
@@ -57,6 +58,7 @@ type alias Model =
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
     , modal : Maybe Modal
+    , dnd : DnDList.Model
     }
 
 
@@ -115,6 +117,7 @@ type Msg
     | SetModalDuration String
     | SaveModal
     | NoOp
+    | DnDMsg DnDList.Msg
 
 
 init : () -> ( Model, Cmd Msg )
@@ -126,6 +129,7 @@ init () =
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
       , modal = Nothing
+      , dnd = dndSystem.model
       }
     , Cmd.none
     )
@@ -421,6 +425,7 @@ viewTimeline :
         , project : Project
         , state : State
         , hoveringAtFrame : Maybe Int
+        , dnd : DnDList.Model
     }
     -> Element Msg
 viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) =
@@ -541,9 +546,10 @@ viewActions :
         | project : Project
         , zoom : Int
         , hoveringAtFrame : Maybe Int
+        , dnd : DnDList.Model
     }
     -> Element Msg
-viewActions ({ project } as model) =
+viewActions ({ project, dnd } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
             |> E.mapAttribute HoverAtPx
@@ -551,8 +557,31 @@ viewActions ({ project } as model) =
             |> E.mapAttribute JumpToFrameAtPx
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
+        , E.inFront (viewActionGhost model)
         ]
         (List.indexedMap (viewAction model) project.actions)
+
+
+viewActionGhost :
+    { a
+        | zoom : Int
+        , project : Project
+        , dnd : DnDList.Model
+        , hoveringAtFrame : Maybe Int
+    }
+    -> Element Msg
+viewActionGhost ({ project, dnd } as model) =
+    dndSystem.info dnd
+        |> Maybe.andThen (\{ dragIndex } -> List.Extra.getAt dragIndex project.actions)
+        |> Maybe.map
+            (\action ->
+                viewActionWith
+                    (List.map E.htmlAttribute (dndSystem.ghostStyles dnd))
+                    Nothing
+                    model
+                    action
+            )
+        |> Maybe.withDefault E.none
 
 
 viewFrameMarker :
@@ -729,11 +758,28 @@ viewAction :
         | zoom : Int
         , hoveringAtFrame : Maybe Int
         , project : Project
+        , dnd : DnDList.Model
     }
     -> Int
     -> Action
     -> Element Msg
-viewAction { zoom, hoveringAtFrame, project } index action =
+viewAction model index action =
+    viewActionWith [] (Just index) model action
+
+
+viewActionWith :
+    List (E.Attribute Msg)
+    -> Maybe Int
+    ->
+        { a
+            | zoom : Int
+            , dnd : DnDList.Model
+            , project : Project
+            , hoveringAtFrame : Maybe Int
+        }
+    -> Action
+    -> Element Msg
+viewActionWith attrs maybeIndex { hoveringAtFrame, project, zoom, dnd } action =
     let
         color =
             Action.bgColor action.raw
@@ -742,83 +788,127 @@ viewAction { zoom, hoveringAtFrame, project } index action =
         hoveringThisAction =
             hoveringAtFrame
                 |> Maybe.andThen (actionIndexForFrame project)
-                |> Maybe.map ((==) index)
+                |> Maybe.map (\i -> Just i == maybeIndex)
                 |> Maybe.withDefault False
 
         modal : Maybe Modal
         modal =
-            case action.raw of
-                TypeText { text, durationFrames } ->
-                    Just <|
-                        EditTypeText
-                            { index = index
-                            , text = text
-                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                            }
+            maybeIndex
+                |> Maybe.andThen
+                    (\index ->
+                        case action.raw of
+                            TypeText { text, durationFrames } ->
+                                Just <|
+                                    EditTypeText
+                                        { index = index
+                                        , text = text
+                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                                        }
 
-                Wait { durationFrames } ->
-                    Just <|
-                        EditWait
-                            { index = index
-                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                            }
+                            Wait { durationFrames } ->
+                                Just <|
+                                    EditWait
+                                        { index = index
+                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                                        }
 
-                FadeOutAndBlank { durationFrames } ->
-                    Just <|
-                        EditFadeOut
-                            { index = index
-                            , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                            }
+                            FadeOutAndBlank { durationFrames } ->
+                                Just <|
+                                    EditFadeOut
+                                        { index = index
+                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
+                                        }
 
-                BlankText ->
-                    Nothing
+                            BlankText ->
+                                Nothing
 
-                SetText { text } ->
-                    Just <|
-                        EditSetText
-                            { index = index
-                            , text = text
-                            }
+                            SetText { text } ->
+                                Just <|
+                                    EditSetText
+                                        { index = index
+                                        , text = text
+                                        }
+                    )
+
+        id =
+            case maybeIndex of
+                Nothing ->
+                    "ghost-action"
+
+                Just index ->
+                    "action-" ++ String.fromInt index
+
+        ( dndEvents, opacity ) =
+            case maybeIndex of
+                Nothing ->
+                    -- this is the ghost element
+                    ( [], 0.75 )
+
+                Just index ->
+                    case dndSystem.info dnd of
+                        Just { dragIndex } ->
+                            if dragIndex /= index then
+                                -- dragging over some other element
+                                ( dndSystem.dropEvents index id, 1 )
+
+                            else
+                                -- dragging over this element
+                                ( [], 0.5 )
+
+                        Nothing ->
+                            -- not dragging at all
+                            ( dndSystem.dragEvents index id, 1 )
     in
     E.el
-        [ EBg.color color
-        , E.height (E.px 70)
-        , E.width
-            (E.px
-                (Zoom.frameToPx
-                    { frame = Action.durationFrames action.raw
-                    , zoom = zoom
-                    }
+        (EBg.color color
+            :: E.height (E.px 70)
+            :: E.width
+                (E.px
+                    (Zoom.frameToPx
+                        { frame = Action.durationFrames action.raw
+                        , zoom = zoom
+                        }
+                    )
                 )
-            )
-        , EBo.width 2
-        , EBo.color (darken 0.1 color)
-        , EBo.rounded 4
-        , EF.color (darken 0.3 color)
-        , EF.size 14
-        , case modal of
-            Nothing ->
-                emptyAttr
+            :: (case modal of
+                    Nothing ->
+                        emptyAttr
 
-            Just modal_ ->
-                EE.onDoubleClick (OpenModal modal_)
-        , E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
-        , E.inFront
-            (if hoveringThisAction then
-                EI.button
-                    [ E.padding 2
-                    , EF.color (E.rgb255 0xFF 0xFF 0xFF)
-                    , EF.center
-                    , E.alignRight
-                    ]
-                    { onPress = Just (RemoveActionAtIndex index)
-                    , label = E.html (FI.toHtml [] FI.x)
-                    }
+                    Just modal_ ->
+                        EE.onDoubleClick (OpenModal modal_)
+               )
+            :: E.inFront
+                (case maybeIndex of
+                    Nothing ->
+                        E.none
 
-             else
-                E.none
-            )
-        ]
+                    Just index ->
+                        if hoveringThisAction then
+                            EI.button
+                                [ E.padding 2
+                                , EF.color (E.rgb255 0xFF 0xFF 0xFF)
+                                , EF.center
+                                , E.alignRight
+                                ]
+                                { onPress = Just (RemoveActionAtIndex index)
+                                , label = E.html (FI.toHtml [] FI.x)
+                                }
+
+                        else
+                            E.none
+                )
+            :: E.clip
+            :: E.alpha opacity
+            :: EBo.width 2
+            :: EBo.color (darken 0.1 color)
+            :: EBo.rounded 4
+            :: EF.color (darken 0.3 color)
+            :: EF.size 14
+            :: E.htmlAttribute (Html.Attributes.id id)
+            :: E.htmlAttribute (Html.Attributes.title (Action.tooltip action.raw))
+            :: List.map E.htmlAttribute dndEvents
+            ++ attrs
+        )
         (viewActionText action.raw)
 
 
@@ -1317,6 +1407,23 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        DnDMsg subMsg ->
+            let
+                ( newDnd, actionsAfterDnd ) =
+                    dndSystem.update subMsg model.dnd model.project.actions
+
+                newProject =
+                    Project.withActions
+                        (List.map .raw actionsAfterDnd)
+                        model.project
+            in
+            ( { model
+                | dnd = newDnd
+                , project = newProject
+              }
+            , dndSystem.commands newDnd
+            )
+
 
 setModalText : String -> Modal -> Modal
 setModalText text modal =
@@ -1444,6 +1551,7 @@ subscriptions model =
                     Sub.batch
                         [ listenForKey " " Play
                         , listenForKey "r" StartRendering
+                        , dndSystem.subscriptions model.dnd
                         ]
 
                   else
@@ -1451,17 +1559,16 @@ subscriptions model =
                 ]
 
         Playing ->
-            Sub.batch
-                [ listenForTick ()
-                , if model.modal == Nothing then
-                    Sub.batch
-                        [ listenForKey " " Play
-                        , listenForKey "r" StartRendering
-                        ]
+            if model.modal == Nothing then
+                Sub.batch
+                    [ listenForKey " " Play
+                    , listenForKey "r" StartRendering
+                    , dndSystem.subscriptions model.dnd
+                    , listenForTick ()
+                    ]
 
-                  else
-                    Sub.none
-                ]
+            else
+                Sub.none
 
         StartingFullscreen ->
             listenForKey " " Pause
@@ -1482,3 +1589,17 @@ subscriptions model =
 emptyAttr : E.Attribute msg
 emptyAttr =
     E.htmlAttribute (Html.Attributes.classList [])
+
+
+dndConfig : DnDList.Config Action
+dndConfig =
+    { beforeUpdate = \_ _ list -> list
+    , movement = DnDList.Horizontal
+    , listen = DnDList.OnDrag
+    , operation = DnDList.Rotate
+    }
+
+
+dndSystem : DnDList.System Action Msg
+dndSystem =
+    DnDList.create dndConfig DnDMsg
