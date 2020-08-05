@@ -15,6 +15,7 @@ import Format
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
+import Html.Events.Extra.Wheel
 import Json.Decode exposing (Decoder)
 import List.Extra
 import List.Zipper as Zipper exposing (Zipper)
@@ -434,6 +435,15 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) 
             }
         , EBo.color (E.rgb255 0x33 0x33 0x33)
         , E.clip
+        , E.htmlAttribute <|
+            Html.Events.Extra.Wheel.onWheel
+                (\event ->
+                    if event.deltaY > 0 then
+                        ZoomOut
+
+                    else
+                        ZoomIn
+                )
         ]
         [ E.column
             [ E.inFront <|
