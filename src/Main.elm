@@ -1,6 +1,14 @@
 port module Main exposing (main)
 
-import Action exposing (Action, RawAction(..))
+import Action
+    exposing
+        ( Action
+        , FadeOutOptions
+        , RawAction(..)
+        , SetTextOptions
+        , TypeTextOptions
+        , WaitOptions
+        )
 import Browser
 import Browser.Events
 import Config exposing (fps, fpsF)
@@ -18,9 +26,11 @@ import Html.Attributes
 import Html.Events
 import Html.Events.Extra.Wheel
 import Json.Decode exposing (Decoder)
+import Json.Encode
 import List.Extra
 import List.Zipper as Zipper exposing (Zipper)
 import Markdown
+import Parser exposing ((|.), (|=), Parser)
 import Process
 import Project exposing (Project)
 import Scene exposing (Scene)
@@ -28,7 +38,6 @@ import Svg
 import Svg.Attributes
 import Task
 import Time
-import Todo
 import Zoom
 
 
@@ -48,12 +57,19 @@ port goFullscreen : () -> Cmd msg
 port exitFullscreen : () -> Cmd msg
 
 
+port save : String -> Cmd msg
+
+
+port load : (String -> msg) -> Sub msg
+
+
 type alias Model =
     { zoom : Int
 
     -- TODO , currentScene : Scene -> use `Scene.advance` later when possible
     , currentFrame : Int
     , project : Project
+    , lastParseUnsuccessful : Bool
     , state : State
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
@@ -118,13 +134,175 @@ type Msg
     | SaveModal
     | NoOp
     | DnDMsg DnDList.Msg
+    | Load String
+
+
+toString_ : Project -> String
+toString_ project =
+    project.actions
+        |> List.map .raw
+        |> toString
+
+
+toString : List RawAction -> String
+toString actions =
+    actions
+        |> List.map actionToString
+        |> String.join "\n\n"
+
+
+actionToString : RawAction -> String
+actionToString action =
+    case action of
+        TypeText r ->
+            [ "TypeText "
+                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
+                ++ "ms"
+            , "```"
+            , r.text
+            , "```"
+            ]
+                |> String.join "\n"
+
+        Wait r ->
+            "Wait "
+                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
+                ++ "ms"
+
+        FadeOutAndBlank r ->
+            "FadeOut "
+                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
+                ++ "ms"
+
+        BlankText ->
+            "Blank"
+
+        SetText r ->
+            [ "SetText"
+            , "```"
+            , r.text
+            , "```"
+            ]
+                |> String.join "\n"
+
+
+parse : String -> Maybe (List RawAction)
+parse string =
+    Parser.run parser string
+        |> Result.toMaybe
+
+
+parser : Parser (List RawAction)
+parser =
+    Parser.succeed identity
+        |= Parser.sequence
+            { start = ""
+            , separator = "\n\n"
+            , end = ""
+            , spaces = Parser.succeed ()
+            , item = actionParser
+            , trailing = Parser.Optional
+            }
+        |. Parser.end
+
+
+actionParser : Parser RawAction
+actionParser =
+    Parser.oneOf
+        [ typeTextParser
+        , waitParser
+        , fadeOutParser
+        , blankParser
+        , setTextParser
+        ]
+
+
+{-|
+
+    TypeText 300ms
+    ```
+    blabla
+
+    def
+    ```
+
+-}
+typeTextParser : Parser RawAction
+typeTextParser =
+    Parser.succeed TypeTextOptions
+        |. Parser.token "TypeText "
+        |= Parser.map Time.ms Parser.int
+        |. Parser.token "ms\n```\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n```")
+        |. Parser.token "\n```"
+        |= Parser.succeed Nothing
+        |> Parser.map TypeText
+
+
+{-|
+
+    Wait 300 ms
+
+-}
+waitParser : Parser RawAction
+waitParser =
+    Parser.succeed WaitOptions
+        |. Parser.token "Wait "
+        |= Parser.map Time.ms Parser.int
+        |. Parser.token "ms"
+        |> Parser.map Wait
+
+
+{-|
+
+    FadeOut 300 ms
+
+-}
+fadeOutParser : Parser RawAction
+fadeOutParser =
+    Parser.succeed FadeOutOptions
+        |. Parser.token "FadeOut "
+        |= Parser.map Time.ms Parser.int
+        |. Parser.token "ms"
+        |> Parser.map FadeOutAndBlank
+
+
+{-|
+
+    Blank
+
+-}
+blankParser : Parser RawAction
+blankParser =
+    Parser.succeed BlankText
+        |. Parser.token "Blank"
+
+
+{-|
+
+    SetText
+    ```
+    blabla
+
+    def
+    ```
+
+-}
+setTextParser : Parser RawAction
+setTextParser =
+    Parser.succeed SetTextOptions
+        |. Parser.token "SetText\n```\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n```")
+        |. Parser.token "\n```"
+        |> Parser.map SetText
 
 
 init : () -> ( Model, Cmd Msg )
 init () =
     ( { zoom = 0
       , currentFrame = 0
-      , project = Todo.project
+      , project = Project.empty
+      , lastParseUnsuccessful = False
       , state = Paused
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
@@ -188,9 +366,46 @@ viewEdit model =
                 Just modal ->
                     viewModal modal
         ]
-        [ viewPreview model
+        [ E.row
+            [ E.width E.fill
+            , E.height E.fill
+            ]
+            [ viewPreview model
+            , viewTextRepresentation model
+            ]
         , viewTimeline model
         ]
+
+
+viewTextRepresentation :
+    { a
+        | project : Project
+        , lastParseUnsuccessful : Bool
+    }
+    -> Element Msg
+viewTextRepresentation { project, lastParseUnsuccessful } =
+    let
+        text =
+            toString_ project
+    in
+    E.html <|
+        Html.textarea
+            [ Html.Attributes.style "width" "400px"
+            , Html.Attributes.style "font-family" "\"Iosevka Janiczek Web\", monospace"
+            , Html.Attributes.style "font-size" "14px"
+            , Html.Attributes.style "height" "calc(100% - 20px)"
+            , Html.Attributes.style "margin" "10px"
+            , Html.Attributes.style "resize" "none"
+            , Html.Attributes.style "background-color"
+                (if lastParseUnsuccessful then
+                    "#FF9988"
+
+                 else
+                    "white"
+                )
+            , Html.Events.onInput Load
+            ]
+            [ Html.text text ]
 
 
 viewModal : Modal -> Element Msg
@@ -343,26 +558,33 @@ viewPreview ({ project, currentFrame, hoveringAtFrame } as model) =
     E.el
         [ E.width E.fill
         , E.height E.fill
-        , E.htmlAttribute (Html.Attributes.style "max-width" "min(1200px, 80vw)")
         , E.centerX
         , E.centerY
-        , E.padding 20
         ]
         (E.el
-            [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
+            [ E.width E.fill
+            , E.height E.fill
+            , E.htmlAttribute (Html.Attributes.style "max-width" "min(1200px, 80vw)")
+            , E.centerX
             , E.centerY
-            , E.htmlAttribute (Html.Attributes.style "position" "relative")
-            , E.htmlAttribute (Html.Attributes.style "width" "100%")
-            , E.htmlAttribute (Html.Attributes.style "height" "0")
-            , E.htmlAttribute (Html.Attributes.style "padding-top" "56.25%")
-            , EBo.shadow
-                { offset = ( 1, 1 )
-                , size = 0
-                , blur = 5
-                , color = E.rgba255 0x10 0x00 0x00 0.75
-                }
+            , E.padding 20
             ]
-            (viewSceneForFrame model frame)
+            (E.el
+                [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
+                , E.centerY
+                , E.htmlAttribute (Html.Attributes.style "position" "relative")
+                , E.htmlAttribute (Html.Attributes.style "width" "100%")
+                , E.htmlAttribute (Html.Attributes.style "height" "0")
+                , E.htmlAttribute (Html.Attributes.style "padding-top" "56.25%")
+                , EBo.shadow
+                    { offset = ( 1, 1 )
+                    , size = 0
+                    , blur = 5
+                    , color = E.rgba255 0x10 0x00 0x00 0.75
+                    }
+                ]
+                (viewSceneForFrame model frame)
+            )
         )
 
 
@@ -382,7 +604,7 @@ viewSceneForFrame ({ project } as model) frame =
 viewScene : { a | project : Project } -> Scene -> Element Msg
 viewScene { project } scene =
     E.el
-        [ EBg.color project.codeBg
+        [ EBg.color (E.rgb255 0x21 0x27 0x33)
         , E.htmlAttribute (Html.Attributes.style "position" "absolute")
         , E.htmlAttribute (Html.Attributes.style "width" "100%")
         , E.htmlAttribute (Html.Attributes.style "height" "100%")
@@ -1231,8 +1453,7 @@ update msg model =
                         |> List.map .raw
 
                 newProject =
-                    model.project
-                        |> Project.withActions (rawActions ++ [ rawAction ])
+                    Project.withActions (rawActions ++ [ rawAction ])
             in
             ( { model | project = newProject }
             , Cmd.none
@@ -1249,8 +1470,7 @@ update msg model =
                         ++ List.drop (index + 1) rawActions
 
                 newProject =
-                    model.project
-                        |> Project.withActions newRawActions
+                    Project.withActions newRawActions
             in
             ( { model | project = newProject }
             , Cmd.none
@@ -1310,8 +1530,7 @@ update msg model =
                                             |> List.Extra.setAt r.index newAction
 
                                     newProject =
-                                        model.project
-                                            |> Project.withActions newActions
+                                        Project.withActions newActions
                                 in
                                 ( { model
                                     | modal = Nothing
@@ -1340,8 +1559,7 @@ update msg model =
                                             |> List.Extra.setAt r.index newAction
 
                                     newProject =
-                                        model.project
-                                            |> Project.withActions newActions
+                                        Project.withActions newActions
                                 in
                                 ( { model
                                     | modal = Nothing
@@ -1370,8 +1588,7 @@ update msg model =
                                             |> List.Extra.setAt r.index newAction
 
                                     newProject =
-                                        model.project
-                                            |> Project.withActions newActions
+                                        Project.withActions newActions
                                 in
                                 ( { model
                                     | modal = Nothing
@@ -1394,8 +1611,7 @@ update msg model =
                                 |> List.Extra.setAt r.index newAction
 
                         newProject =
-                            model.project
-                                |> Project.withActions newActions
+                            Project.withActions newActions
                     in
                     ( { model
                         | modal = Nothing
@@ -1415,7 +1631,6 @@ update msg model =
                 newProject =
                     Project.withActions
                         (List.map .raw actionsAfterDnd)
-                        model.project
             in
             ( { model
                 | dnd = newDnd
@@ -1423,6 +1638,22 @@ update msg model =
               }
             , dndSystem.commands newDnd
             )
+
+        Load string ->
+            parse string
+                |> Maybe.map
+                    (\rawActions ->
+                        ( { model
+                            | lastParseUnsuccessful = False
+                            , project = Project.withActions rawActions
+                          }
+                        , save string
+                        )
+                    )
+                |> Maybe.withDefault
+                    ( { model | lastParseUnsuccessful = True }
+                    , Cmd.none
+                    )
 
 
 setModalText : String -> Modal -> Modal
@@ -1556,6 +1787,7 @@ subscriptions model =
 
                   else
                     Sub.none
+                , load Load
                 ]
 
         Playing ->

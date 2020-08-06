@@ -1,4 +1,4 @@
-module Project exposing (Project, init, withActions)
+module Project exposing (Project, empty, withActions)
 
 import Action exposing (Action, RawAction)
 import Element as E
@@ -9,28 +9,19 @@ type alias Project =
     { actions : List Action
     , totalFrames : Int
     , endFrame : Int
-    , codeBg : E.Color
     }
 
 
-init :
-    { actions : List RawAction
-    , codeBg : E.Color
-    }
-    -> Project
-init { actions, codeBg } =
-    { codeBg = codeBg
-
-    -- the rest will be set in `withActions`
-    , actions = []
+empty : Project
+empty =
+    { actions = []
     , totalFrames = 0
-    , endFrame = 0
+    , endFrame = -1
     }
-        |> withActions actions
 
 
-withActions : List RawAction -> Project -> Project
-withActions actions project =
+withActions : List RawAction -> Project
+withActions actions =
     let
         ( totalFrames, processedActions ) =
             List.Extra.indexedFoldl
@@ -52,8 +43,7 @@ withActions actions project =
                 actions
                 |> Tuple.mapSecond List.reverse
     in
-    { project
-        | actions = processedActions
-        , totalFrames = totalFrames
-        , endFrame = totalFrames - 1
+    { actions = processedActions
+    , totalFrames = totalFrames
+    , endFrame = totalFrames - 1
     }

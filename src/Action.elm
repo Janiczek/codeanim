@@ -51,8 +51,8 @@ type alias Action =
 
 
 type alias TypeTextOptions =
-    { text : String
-    , durationFrames : Int
+    { durationFrames : Int
+    , text : String
     , position : Maybe Int -- Nothing = at the end
     }
 

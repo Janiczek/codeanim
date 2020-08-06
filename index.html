@@ -23,6 +23,15 @@
                 document.exitFullscreen();
                 document.documentElement.style.cursor = 'default';
             });
+
+            app.ports.save.subscribe((project) => {
+                localStorage.setItem('project', project);
+            });
+
+            const savedProject = localStorage.getItem('project');
+            if (savedProject != null) {
+                app.ports.load.send(savedProject);
+            }
         </script>
     </body>
 </html>

@@ -1,5 +1,6 @@
 module Time exposing
     ( frameToMs
+    , frameToMs_
     , ms
     , msToFrame
     , percentage
@@ -21,6 +22,11 @@ ms ms_ =
 frameToMs : Int -> Float
 frameToMs frame =
     toFloat frame * 1000 / fpsF
+
+
+frameToMs_ : Int -> Int
+frameToMs_ frame =
+    round <| frameToMs frame
 
 
 percentage : Int -> Int -> Float
