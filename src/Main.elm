@@ -73,29 +73,8 @@ type alias Model =
     , state : State
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
-    , modal : Maybe Modal
     , dnd : DnDList.Model
     }
-
-
-type Modal
-    = EditTypeText
-        { index : Int
-        , text : String
-        , duration : String
-        }
-    | EditWait
-        { index : Int
-        , duration : String
-        }
-    | EditFadeOut
-        { index : Int
-        , duration : String
-        }
-    | EditSetText
-        { index : Int
-        , text : String
-        }
 
 
 type State
@@ -127,11 +106,6 @@ type Msg
     | StartRendering
     | AddAction RawAction
     | RemoveActionAtIndex Int
-    | OpenModal Modal
-    | CloseModal
-    | SetModalText String
-    | SetModalDuration String
-    | SaveModal
     | NoOp
     | DnDMsg DnDList.Msg
     | Load String
@@ -148,7 +122,7 @@ toString : List RawAction -> String
 toString actions =
     actions
         |> List.map actionToString
-        |> String.join "\n\n"
+        |> String.join "\n\n---\n\n"
 
 
 actionToString : RawAction -> String
@@ -197,7 +171,7 @@ parser =
     Parser.succeed identity
         |= Parser.sequence
             { start = ""
-            , separator = "\n\n"
+            , separator = "\n\n---\n\n"
             , end = ""
             , spaces = Parser.succeed ()
             , item = actionParser
@@ -306,7 +280,6 @@ init () =
       , state = Paused
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
-      , modal = Nothing
       , dnd = dndSystem.model
       }
     , Cmd.none
@@ -319,7 +292,6 @@ view model =
         [ EBg.color (E.rgb255 0x70 0x70 0x70)
         , E.width E.fill
         , E.height E.fill
-        , EE.onClick CloseModal
         ]
         (case model.state of
             Paused ->
@@ -358,13 +330,6 @@ viewEdit model =
         [ E.width E.fill
         , E.height E.fill
         , E.clip
-        , E.inFront <|
-            case model.modal of
-                Nothing ->
-                    E.none
-
-                Just modal ->
-                    viewModal modal
         ]
         [ E.row
             [ E.width E.fill
@@ -408,152 +373,25 @@ viewTextRepresentation { project, lastParseUnsuccessful } =
             [ Html.text text ]
 
 
-viewModal : Modal -> Element Msg
-viewModal modal =
-    E.el
-        [ E.centerX
-        , E.centerY
-        , E.htmlAttribute
-            (Html.Events.stopPropagationOn "click"
-                (Json.Decode.succeed ( NoOp, True ))
-            )
-        ]
-        (E.column
-            [ E.width (E.px 600)
-            , E.height (E.px 600)
-            , E.padding 20
-            , EBg.color (E.rgb255 0x90 0x90 0x90)
-            , E.spacing 20
-            ]
-            (viewModalContents modal
-                ++ [ E.row
-                        [ E.spaceEvenly
-                        , E.width E.fill
-                        ]
-                        [ EI.button
-                            [ E.padding 20
-                            , EBg.color (E.rgb255 0x90 0xB0 0x90)
-                            , EBo.width 2
-                            , EBo.color (E.rgb255 0x70 0x90 0x70)
-                            ]
-                            { onPress = Just SaveModal
-                            , label =
-                                E.el
-                                    [ E.centerX
-                                    , E.centerY
-                                    ]
-                                    (E.text "Save")
-                            }
-                        , EI.button
-                            [ E.padding 20
-                            , EBg.color (E.rgb255 0xB0 0x90 0x90)
-                            , EBo.width 2
-                            , EBo.color (E.rgb255 0x90 0x70 0x70)
-                            ]
-                            { onPress = Just CloseModal
-                            , label =
-                                E.el
-                                    [ E.centerX
-                                    , E.centerY
-                                    ]
-                                    (E.text "Cancel")
-                            }
-                        ]
-                   ]
-            )
-        )
-
-
-viewModalContents : Modal -> List (Element Msg)
-viewModalContents modal =
-    case modal of
-        EditTypeText { index, text, duration } ->
-            [ viewModalHeading "Type Text"
-            , EI.multiline
-                []
-                { onChange = SetModalText
-                , text = text
-                , placeholder = Nothing
-                , spellcheck = False
-                , label =
-                    EI.labelAbove []
-                        (E.text "Text")
-                }
-            , EI.text
-                []
-                { onChange = SetModalDuration
-                , text = duration
-                , placeholder = Nothing
-                , label =
-                    EI.labelAbove []
-                        (E.text "Duration (ms)")
-                }
-            ]
-
-        EditWait { index, duration } ->
-            [ viewModalHeading "Wait"
-            , EI.text
-                []
-                { onChange = SetModalDuration
-                , text = duration
-                , placeholder = Nothing
-                , label =
-                    EI.labelAbove []
-                        (E.text "Duration (ms)")
-                }
-            ]
-
-        EditFadeOut { index, duration } ->
-            [ viewModalHeading "Fade Out"
-            , EI.text
-                []
-                { onChange = SetModalDuration
-                , text = duration
-                , placeholder = Nothing
-                , label =
-                    EI.labelAbove []
-                        (E.text "Duration (ms)")
-                }
-            ]
-
-        EditSetText { index, text } ->
-            [ viewModalHeading "Set Text"
-            , EI.multiline
-                []
-                { onChange = SetModalText
-                , text = text
-                , placeholder = Nothing
-                , spellcheck = False
-                , label =
-                    EI.labelAbove []
-                        (E.text "Text")
-                }
-            ]
-
-
-viewModalHeading : String -> Element Msg
-viewModalHeading heading =
-    E.el
-        [ EF.size 30
-        , EF.bold
-        ]
-        (E.text heading)
-
-
 viewPreview :
     { a
         | currentFrame : Int
         , project : Project
         , hoveringAtFrame : Maybe Int
+        , dnd : DnDList.Model
     }
     -> Element Msg
-viewPreview ({ project, currentFrame, hoveringAtFrame } as model) =
+viewPreview ({ project, currentFrame, hoveringAtFrame, dnd } as model) =
     let
         frame : Int
         frame =
-            hoveringAtFrame
-                |> Maybe.map (min project.totalFrames)
-                |> Maybe.withDefault currentFrame
+            if dndSystem.info dnd == Nothing then
+                hoveringAtFrame
+                    |> Maybe.map (min project.totalFrames)
+                    |> Maybe.withDefault currentFrame
+
+            else
+                currentFrame
     in
     E.el
         [ E.width E.fill
@@ -650,7 +488,7 @@ viewTimeline :
         , dnd : DnDList.Model
     }
     -> Element Msg
-viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) =
+viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame, dnd } as model) =
     E.column
         [ E.width E.fill
         , EBg.color (E.rgb255 0x50 0x50 0x50)
@@ -673,16 +511,20 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame } as model) 
                 )
         ]
         [ E.column
-            [ E.inFront <|
-                case hoveringAtFrame of
-                    Just frame ->
-                        viewFrameMarker
-                            model
-                            frame
-                            (E.rgb255 0xFF 0xFF 0xFF)
+            [ if dndSystem.info dnd == Nothing then
+                E.inFront <|
+                    case hoveringAtFrame of
+                        Just frame ->
+                            viewFrameMarker
+                                model
+                                frame
+                                (E.rgb255 0xFF 0xFF 0xFF)
 
-                    Nothing ->
-                        E.none
+                        Nothing ->
+                            E.none
+
+              else
+                emptyAttr
             , E.inFront <|
                 viewFrameMarker
                     model
@@ -775,8 +617,12 @@ viewActions ({ project, dnd } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
             |> E.mapAttribute HoverAtPx
-        , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
-            |> E.mapAttribute JumpToFrameAtPx
+        , if dndSystem.info dnd == Nothing then
+            E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
+                |> E.mapAttribute JumpToFrameAtPx
+
+          else
+            emptyAttr
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
         , E.inFront (viewActionGhost model)
@@ -1013,45 +859,6 @@ viewActionWith attrs maybeIndex { hoveringAtFrame, project, zoom, dnd } action =
                 |> Maybe.map (\i -> Just i == maybeIndex)
                 |> Maybe.withDefault False
 
-        modal : Maybe Modal
-        modal =
-            maybeIndex
-                |> Maybe.andThen
-                    (\index ->
-                        case action.raw of
-                            TypeText { text, durationFrames } ->
-                                Just <|
-                                    EditTypeText
-                                        { index = index
-                                        , text = text
-                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                                        }
-
-                            Wait { durationFrames } ->
-                                Just <|
-                                    EditWait
-                                        { index = index
-                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                                        }
-
-                            FadeOutAndBlank { durationFrames } ->
-                                Just <|
-                                    EditFadeOut
-                                        { index = index
-                                        , duration = String.fromInt (round (Time.frameToMs durationFrames))
-                                        }
-
-                            BlankText ->
-                                Nothing
-
-                            SetText { text } ->
-                                Just <|
-                                    EditSetText
-                                        { index = index
-                                        , text = text
-                                        }
-                    )
-
         id =
             case maybeIndex of
                 Nothing ->
@@ -1092,13 +899,6 @@ viewActionWith attrs maybeIndex { hoveringAtFrame, project, zoom, dnd } action =
                         }
                     )
                 )
-            :: (case modal of
-                    Nothing ->
-                        emptyAttr
-
-                    Just modal_ ->
-                        EE.onDoubleClick (OpenModal modal_)
-               )
             :: E.inFront
                 (case maybeIndex of
                     Nothing ->
@@ -1455,7 +1255,10 @@ update msg model =
                 newProject =
                     Project.withActions (rawActions ++ [ rawAction ])
             in
-            ( { model | project = newProject }
+            ( { model
+                | project = newProject
+                , lastParseUnsuccessful = False
+              }
             , Cmd.none
             )
 
@@ -1472,153 +1275,12 @@ update msg model =
                 newProject =
                     Project.withActions newRawActions
             in
-            ( { model | project = newProject }
-            , Cmd.none
-            )
-
-        OpenModal modal ->
-            ( { model | modal = Just modal }
-            , Cmd.none
-            )
-
-        CloseModal ->
-            ( { model | modal = Nothing }
-            , Cmd.none
-            )
-
-        SetModalText text ->
             ( { model
-                | modal =
-                    model.modal
-                        |> Maybe.map (\modal -> setModalText text modal)
+                | project = newProject
+                , lastParseUnsuccessful = False
               }
             , Cmd.none
             )
-
-        SetModalDuration duration ->
-            ( { model
-                | modal =
-                    model.modal
-                        |> Maybe.map (\modal -> setModalDuration duration modal)
-              }
-            , Cmd.none
-            )
-
-        SaveModal ->
-            case model.modal of
-                Nothing ->
-                    ( model, Cmd.none )
-
-                Just (EditTypeText r) ->
-                    String.toInt r.duration
-                        |> Maybe.map
-                            (\durationMs ->
-                                let
-                                    duration =
-                                        Time.ms durationMs
-
-                                    newAction =
-                                        TypeText
-                                            { text = r.text
-                                            , durationFrames = duration
-                                            , position = Nothing
-                                            }
-
-                                    newActions =
-                                        model.project.actions
-                                            |> List.map .raw
-                                            |> List.Extra.setAt r.index newAction
-
-                                    newProject =
-                                        Project.withActions newActions
-                                in
-                                ( { model
-                                    | modal = Nothing
-                                    , project = newProject
-                                  }
-                                , Cmd.none
-                                )
-                            )
-                        |> Maybe.withDefault ( model, Cmd.none )
-
-                Just (EditWait r) ->
-                    String.toInt r.duration
-                        |> Maybe.map
-                            (\durationMs ->
-                                let
-                                    duration =
-                                        Time.ms durationMs
-
-                                    newAction =
-                                        Wait
-                                            { durationFrames = duration }
-
-                                    newActions =
-                                        model.project.actions
-                                            |> List.map .raw
-                                            |> List.Extra.setAt r.index newAction
-
-                                    newProject =
-                                        Project.withActions newActions
-                                in
-                                ( { model
-                                    | modal = Nothing
-                                    , project = newProject
-                                  }
-                                , Cmd.none
-                                )
-                            )
-                        |> Maybe.withDefault ( model, Cmd.none )
-
-                Just (EditFadeOut r) ->
-                    String.toInt r.duration
-                        |> Maybe.map
-                            (\durationMs ->
-                                let
-                                    duration =
-                                        Time.ms durationMs
-
-                                    newAction =
-                                        FadeOutAndBlank
-                                            { durationFrames = duration }
-
-                                    newActions =
-                                        model.project.actions
-                                            |> List.map .raw
-                                            |> List.Extra.setAt r.index newAction
-
-                                    newProject =
-                                        Project.withActions newActions
-                                in
-                                ( { model
-                                    | modal = Nothing
-                                    , project = newProject
-                                  }
-                                , Cmd.none
-                                )
-                            )
-                        |> Maybe.withDefault ( model, Cmd.none )
-
-                Just (EditSetText r) ->
-                    let
-                        newAction =
-                            SetText
-                                { text = r.text }
-
-                        newActions =
-                            model.project.actions
-                                |> List.map .raw
-                                |> List.Extra.setAt r.index newAction
-
-                        newProject =
-                            Project.withActions newActions
-                    in
-                    ( { model
-                        | modal = Nothing
-                        , project = newProject
-                      }
-                    , Cmd.none
-                    )
 
         NoOp ->
             ( model, Cmd.none )
@@ -1654,43 +1316,6 @@ update msg model =
                     ( { model | lastParseUnsuccessful = True }
                     , Cmd.none
                     )
-
-
-setModalText : String -> Modal -> Modal
-setModalText text modal =
-    case modal of
-        EditTypeText r ->
-            EditTypeText
-                { r | text = text }
-
-        EditSetText r ->
-            EditSetText
-                { r | text = text }
-
-        EditWait _ ->
-            modal
-
-        EditFadeOut _ ->
-            modal
-
-
-setModalDuration : String -> Modal -> Modal
-setModalDuration duration modal =
-    case modal of
-        EditTypeText r ->
-            EditTypeText
-                { r | duration = duration }
-
-        EditSetText _ ->
-            modal
-
-        EditWait r ->
-            EditWait
-                { r | duration = duration }
-
-        EditFadeOut r ->
-            EditFadeOut
-                { r | duration = duration }
 
 
 previousActionFrame : Int -> Project -> Int
@@ -1778,29 +1403,19 @@ subscriptions model =
     case model.state of
         Paused ->
             Sub.batch
-                [ if model.modal == Nothing then
-                    Sub.batch
-                        [ listenForKey " " Play
-                        , listenForKey "r" StartRendering
-                        , dndSystem.subscriptions model.dnd
-                        ]
-
-                  else
-                    Sub.none
+                [ listenForKey " " Play
+                , listenForKey "r" StartRendering
+                , dndSystem.subscriptions model.dnd
                 , load Load
                 ]
 
         Playing ->
-            if model.modal == Nothing then
-                Sub.batch
-                    [ listenForKey " " Play
-                    , listenForKey "r" StartRendering
-                    , dndSystem.subscriptions model.dnd
-                    , listenForTick ()
-                    ]
-
-            else
-                Sub.none
+            Sub.batch
+                [ listenForKey " " Play
+                , listenForKey "r" StartRendering
+                , dndSystem.subscriptions model.dnd
+                , listenForTick ()
+                ]
 
         StartingFullscreen ->
             listenForKey " " Pause
