@@ -13,6 +13,7 @@ module Action exposing
 
 import Element as E
 import Format
+import Time
 
 
 bgColor : RawAction -> E.Color
@@ -85,13 +86,13 @@ durationFrames action =
             {- TODO make this ms-based so that it takes the same amount of time
                with different FPS settings
             -}
-            6
+            Time.ms 500
 
         SetText _ ->
             {- TODO make this ms-based so that it takes the same amount of time
                with different FPS settings
             -}
-            6
+            Time.ms 500
 
 
 snippet : String -> String

@@ -625,6 +625,7 @@ viewActions ({ project, dnd } as model) =
             emptyAttr
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
+        , E.height (E.px 70)
         , E.inFront (viewActionGhost model)
         ]
         (List.indexedMap (viewAction model) project.actions)
@@ -1259,7 +1260,7 @@ update msg model =
                 | project = newProject
                 , lastParseUnsuccessful = False
               }
-            , Cmd.none
+            , save (toString_ newProject)
             )
 
         RemoveActionAtIndex index ->
@@ -1279,7 +1280,7 @@ update msg model =
                 | project = newProject
                 , lastParseUnsuccessful = False
               }
-            , Cmd.none
+            , save (toString_ newProject)
             )
 
         NoOp ->
@@ -1298,7 +1299,10 @@ update msg model =
                 | dnd = newDnd
                 , project = newProject
               }
-            , dndSystem.commands newDnd
+            , Cmd.batch
+                [ dndSystem.commands newDnd
+                , save (toString_ newProject)
+                ]
             )
 
         Load string ->
@@ -1411,7 +1415,7 @@ subscriptions model =
 
         Playing ->
             Sub.batch
-                [ listenForKey " " Play
+                [ listenForKey " " Pause
                 , listenForKey "r" StartRendering
                 , dndSystem.subscriptions model.dnd
                 , listenForTick ()
