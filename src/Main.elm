@@ -74,6 +74,7 @@ type alias Model =
     , leftoverDelta : Float
     , hoveringAtFrame : Maybe Int
     , dnd : DnDList.Model
+    , userText : String
     }
 
 
@@ -281,6 +282,7 @@ init () =
       , hoveringAtFrame = Nothing
       , leftoverDelta = 0
       , dnd = dndSystem.model
+      , userText = ""
       }
     , Cmd.none
     )
@@ -346,13 +348,10 @@ viewTextRepresentation :
     { a
         | project : Project
         , lastParseUnsuccessful : Bool
+        , userText : String
     }
     -> Element Msg
-viewTextRepresentation { project, lastParseUnsuccessful } =
-    let
-        text =
-            toString_ project
-    in
+viewTextRepresentation { project, lastParseUnsuccessful, userText } =
     E.html <|
         Html.textarea
             [ Html.Attributes.style "width" "400px"
@@ -369,8 +368,9 @@ viewTextRepresentation { project, lastParseUnsuccessful } =
                     "white"
                 )
             , Html.Events.onInput Load
+            , Html.Attributes.value userText
             ]
-            [ Html.text text ]
+            []
 
 
 viewPreview :
@@ -509,6 +509,7 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame, dnd } as mo
                     else
                         ZoomIn
                 )
+        , E.htmlAttribute (Html.Attributes.style "user-select" "none")
         ]
         [ E.column
             [ if dndSystem.info dnd == Nothing then
@@ -1251,12 +1252,16 @@ update msg model =
 
                 newProject =
                     Project.withActions (rawActions ++ [ rawAction ])
+
+                projectString =
+                    toString_ newProject
             in
             ( { model
                 | project = newProject
                 , lastParseUnsuccessful = False
+                , userText = projectString
               }
-            , save (toString_ newProject)
+            , save projectString
             )
 
         RemoveActionAtIndex index ->
@@ -1271,12 +1276,16 @@ update msg model =
 
                 newProject =
                     Project.withActions newRawActions
+
+                projectString =
+                    toString_ newProject
             in
             ( { model
                 | project = newProject
                 , lastParseUnsuccessful = False
+                , userText = projectString
               }
-            , save (toString_ newProject)
+            , save projectString
             )
 
         NoOp ->
@@ -1290,14 +1299,18 @@ update msg model =
                 newProject =
                     Project.withActions
                         (List.map .raw actionsAfterDnd)
+
+                projectString =
+                    toString_ newProject
             in
             ( { model
                 | dnd = newDnd
                 , project = newProject
+                , userText = projectString
               }
             , Cmd.batch
                 [ dndSystem.commands newDnd
-                , save (toString_ newProject)
+                , save projectString
                 ]
             )
 
@@ -1308,12 +1321,16 @@ update msg model =
                         ( { model
                             | lastParseUnsuccessful = False
                             , project = Project.withActions rawActions
+                            , userText = string
                           }
                         , save string
                         )
                     )
                 |> Maybe.withDefault
-                    ( { model | lastParseUnsuccessful = True }
+                    ( { model
+                        | lastParseUnsuccessful = True
+                        , userText = string
+                      }
                     , Cmd.none
                     )
 
