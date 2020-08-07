@@ -617,12 +617,8 @@ viewActions ({ project, dnd } as model) =
     E.row
         [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
             |> E.mapAttribute HoverAtPx
-        , if dndSystem.info dnd == Nothing then
-            E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
-                |> E.mapAttribute JumpToFrameAtPx
-
-          else
-            emptyAttr
+        , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
+            |> E.mapAttribute JumpToFrameAtPx
         , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
         , E.width E.fill
         , E.height (E.px 70)
