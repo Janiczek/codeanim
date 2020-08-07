@@ -1378,9 +1378,9 @@ actionIndexForFrame project frame =
         |> Maybe.map .index
 
 
-onKeyPress : String -> Msg -> Decoder Msg
-onKeyPress key msg =
-    Json.Decode.field "key" Json.Decode.string
+onKeyDown : String -> Msg -> Decoder Msg
+onKeyDown key msg =
+    Json.Decode.field "code" Json.Decode.string
         |> Json.Decode.andThen
             (\string ->
                 if string == key then
@@ -1398,39 +1398,42 @@ subscriptions model =
             Browser.Events.onAnimationFrameDelta Tick
 
         listenForKey key msg =
-            Browser.Events.onKeyPress (onKeyPress key msg)
+            Browser.Events.onKeyDown (onKeyDown key msg)
     in
     case model.state of
         Paused ->
             Sub.batch
-                [ listenForKey " " Play
-                , listenForKey "r" StartRendering
+                [ listenForKey "F1" Play
+                , listenForKey "F2" StartRendering
                 , dndSystem.subscriptions model.dnd
                 , load Load
                 ]
 
         Playing ->
             Sub.batch
-                [ listenForKey " " Pause
-                , listenForKey "r" StartRendering
+                [ listenForKey "F1" Pause
+                , listenForKey "F2" StartRendering
                 , dndSystem.subscriptions model.dnd
                 , listenForTick ()
                 ]
 
         StartingFullscreen ->
-            listenForKey " " Pause
+            listenForKey "F1" Pause
 
         PlayingFullscreen ->
             Sub.batch
                 [ listenForTick ()
-                , listenForKey " " Pause
+                , listenForKey "F1" Pause
                 ]
 
         EndingFullscreen ->
-            listenForKey " " Pause
+            listenForKey "F1" Pause
 
         Rendering ->
-            listenForKey " " (JumpForward 1)
+            Sub.batch
+                [ listenForKey "F1" (JumpForward 1)
+                , listenForKey "F2" Pause
+                ]
 
 
 emptyAttr : E.Attribute msg

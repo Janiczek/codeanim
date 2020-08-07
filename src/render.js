@@ -12,7 +12,7 @@ const fs = require('fs').promises;
   });
   const page = await browser.newPage();
   await page.goto('http://localhost:8000/index.html');
-  await page.keyboard.press('KeyR');
+  await page.keyboard.press('F2');
   let frame = 0;
   const date = +new Date();
   await fs.mkdir(`render${date}`);
@@ -21,7 +21,7 @@ const fs = require('fs').promises;
       console.log(`Rendering frame ${frame}`);
       await page.waitForSelector('#fullscreen-scene', {timeout: 500});
       await page.screenshot({path: `render${date}/frame${frame.toString().padStart(3,'0')}.png`});
-      await page.keyboard.press('Space');
+      await page.keyboard.press('F1');
       frame++;
     } catch (e) {
       console.log('error');
