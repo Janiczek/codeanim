@@ -777,7 +777,7 @@ viewAddButtons =
             , viewButton
                 (AddAction
                     (Wait
-                        { durationFrames = Time.ms 1000 }
+                        { durationFrames = Time.ms 2000 }
                     )
                 )
                 FI.watch
@@ -785,7 +785,7 @@ viewAddButtons =
             , viewButton
                 (AddAction
                     (FadeOutAndBlank
-                        { durationFrames = Time.ms 1000 }
+                        { durationFrames = Time.ms 500 }
                     )
                 )
                 FI.loader
