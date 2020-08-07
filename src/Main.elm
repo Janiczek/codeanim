@@ -137,6 +137,13 @@ actionToString action =
             [ "##### TypeText "
                 ++ String.fromInt (Time.frameToMs_ r.durationFrames)
                 ++ "ms"
+                ++ (case r.position of
+                        Nothing ->
+                            ""
+
+                        Just position ->
+                            " at " ++ String.fromInt position
+                   )
             , r.text
             ]
                 |> String.join "\n"
@@ -205,9 +212,15 @@ typeTextParser =
     Parser.succeed TypeTextOptions
         |. Parser.token "##### TypeText "
         |= Parser.map Time.ms Parser.int
-        |. Parser.token "ms\n"
+        |. Parser.token "ms"
+        |= Parser.oneOf
+            [ Parser.succeed Just
+                |. Parser.token " at "
+                |= Parser.int
+            , Parser.succeed Nothing
+            ]
+        |. Parser.token "\n"
         |= Parser.getChompedString (Parser.chompUntil "\n#####")
-        |= Parser.succeed Nothing
         |> Parser.map TypeText
 
 

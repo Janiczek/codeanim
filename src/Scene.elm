@@ -133,14 +133,6 @@ computeFrom frame endFrame currentAction restOfActions accScene =
 advanceTypeText : TypeTextOptions -> Int -> Action -> Scene -> Scene
 advanceTypeText { text, durationFrames, position } frame currentAction scene =
     let
-        _ =
-            case position of
-                Nothing ->
-                    ()
-
-                Just _ ->
-                    Debug.todo "Handle position!"
-
         textLength : Int
         textLength =
             String.length text
@@ -168,7 +160,14 @@ advanceTypeText { text, durationFrames, position } frame currentAction scene =
         newText : String
         newText =
             if previousLength /= newLength then
-                scene.text ++ String.slice previousLength newLength text
+                case position of
+                    Nothing ->
+                        scene.text ++ String.slice previousLength newLength text
+
+                    Just position_ ->
+                        String.left (position_ + previousLength) scene.text
+                            ++ String.slice previousLength newLength text
+                            ++ String.dropLeft (position_ + previousLength) scene.text
 
             else
                 scene.text
