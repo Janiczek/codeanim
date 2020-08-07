@@ -530,6 +530,11 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame, dnd } as mo
             , E.width E.fill
             , E.htmlAttribute (Html.Attributes.style "overflow-x" "scroll")
             , E.htmlAttribute (Html.Events.on "scroll" (onScroll SetScrollX))
+            , E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
+                |> E.mapAttribute HoverAtPx
+            , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
+                |> E.mapAttribute JumpToFrameAtPx
+            , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
             ]
             [ viewSecondsRuler model
             , viewActions model
@@ -614,12 +619,7 @@ viewActions :
     -> Element Msg
 viewActions ({ project, dnd } as model) =
     E.row
-        [ E.htmlAttribute (Html.Events.on "mousemove" currentPxDecoder)
-            |> E.mapAttribute HoverAtPx
-        , E.htmlAttribute (Html.Events.on "click" currentPxDecoder)
-            |> E.mapAttribute JumpToFrameAtPx
-        , E.htmlAttribute (Html.Events.onMouseOut HoverOff)
-        , E.width E.fill
+        [ E.width E.fill
         , E.height (E.px 70)
         , E.inFront (viewActionGhost model)
         ]
@@ -1057,7 +1057,7 @@ update msg model =
             )
 
         JumpToEnd ->
-            ( { model | currentFrame = model.project.endFrame }
+            ( { model | currentFrame = model.project.totalFrames }
             , Cmd.none
             )
 
@@ -1133,7 +1133,7 @@ update msg model =
 
                         newCurrentFrame =
                             if hasEnded then
-                                model.project.endFrame
+                                model.project.totalFrames
 
                             else
                                 advancedCurrentFrame

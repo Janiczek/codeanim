@@ -15,7 +15,7 @@ zoomMultiplier zoom =
 
 frameToPx : { frame : Int, zoom : Int } -> Int
 frameToPx { frame, zoom } =
-    round <|
+    floor <|
         Time.frameToMs frame
             * globalMultiplier
             * zoomMultiplier zoom
@@ -23,7 +23,7 @@ frameToPx { frame, zoom } =
 
 pxToFrame : { px : Int, zoom : Int } -> Int
 pxToFrame { px, zoom } =
-    round <|
+    ceiling <|
         Time.msToFrame <|
             toFloat px
                 / globalMultiplier

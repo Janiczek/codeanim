@@ -26,7 +26,7 @@ frameToMs frame =
 
 frameToMs_ : Int -> Int
 frameToMs_ frame =
-    round <| frameToMs frame
+    floor <| frameToMs frame
 
 
 percentage : Int -> Int -> Float

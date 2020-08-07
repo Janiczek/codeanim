@@ -141,21 +141,29 @@ advanceTypeText { text, durationFrames, position } frame currentAction scene =
                 Just _ ->
                     Debug.todo "Handle position!"
 
+        textLength : Int
+        textLength =
+            String.length text
+
         previousLength : Int
         previousLength =
             charsWritten
-                { stringLength = String.length text
+                { stringLength = textLength
                 , durationFrames = durationFrames
                 , currentFrame = frame - currentAction.startFrame - 1
                 }
 
         newLength : Int
         newLength =
-            charsWritten
-                { stringLength = String.length text
-                , durationFrames = durationFrames
-                , currentFrame = frame - currentAction.startFrame
-                }
+            if frame == currentAction.endFrame then
+                textLength
+
+            else
+                charsWritten
+                    { stringLength = textLength
+                    , durationFrames = durationFrames
+                    , currentFrame = frame - currentAction.startFrame
+                    }
 
         newText : String
         newText =
