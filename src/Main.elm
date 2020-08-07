@@ -135,8 +135,8 @@ actionToString action =
     case action of
         TypeText r ->
             [ "##### TypeText "
-                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
-                ++ "ms"
+                ++ String.fromInt r.durationFrames
+                ++ "f"
                 ++ (case r.position of
                         Nothing ->
                             ""
@@ -150,13 +150,13 @@ actionToString action =
 
         Wait r ->
             "##### Wait "
-                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
-                ++ "ms"
+                ++ String.fromInt r.durationFrames
+                ++ "f"
 
         FadeOutAndBlank r ->
             "##### FadeOut "
-                ++ String.fromInt (Time.frameToMs_ r.durationFrames)
-                ++ "ms"
+                ++ String.fromInt r.durationFrames
+                ++ "f"
 
         BlankText ->
             "##### Blank"
@@ -201,7 +201,7 @@ actionParser =
 
 {-|
 
-    ##### TypeText 300ms
+    ##### TypeText 20f
     blabla
 
     def
@@ -211,8 +211,8 @@ typeTextParser : Parser RawAction
 typeTextParser =
     Parser.succeed TypeTextOptions
         |. Parser.token "##### TypeText "
-        |= Parser.map Time.ms Parser.int
-        |. Parser.token "ms"
+        |= Parser.int
+        |. Parser.token "f"
         |= Parser.oneOf
             [ Parser.succeed Just
                 |. Parser.token " at "
@@ -226,29 +226,29 @@ typeTextParser =
 
 {-|
 
-    ##### Wait 300 ms
+    ##### Wait 20f
 
 -}
 waitParser : Parser RawAction
 waitParser =
     Parser.succeed WaitOptions
         |. Parser.token "##### Wait "
-        |= Parser.map Time.ms Parser.int
-        |. Parser.token "ms"
+        |= Parser.int
+        |. Parser.token "f"
         |> Parser.map Wait
 
 
 {-|
 
-    ##### FadeOut 300 ms
+    ##### FadeOut 20f
 
 -}
 fadeOutParser : Parser RawAction
 fadeOutParser =
     Parser.succeed FadeOutOptions
         |. Parser.token "##### FadeOut "
-        |= Parser.map Time.ms Parser.int
-        |. Parser.token "ms"
+        |= Parser.int
+        |. Parser.token "f"
         |> Parser.map FadeOutAndBlank
 
 
