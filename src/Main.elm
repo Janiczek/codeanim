@@ -75,6 +75,7 @@ type alias Model =
     , hoveringAtFrame : Maybe Int
     , dnd : DnDList.Model
     , userText : String
+    , timelineScrollX : Int
     }
 
 
@@ -110,6 +111,7 @@ type Msg
     | NoOp
     | DnDMsg DnDList.Msg
     | Load String
+    | SetScrollX Int
 
 
 toString_ : Project -> String
@@ -121,42 +123,40 @@ toString_ project =
 
 toString : List RawAction -> String
 toString actions =
-    actions
+    (actions
         |> List.map actionToString
-        |> String.join "\n\n---\n\n"
+        |> String.join "\n"
+    )
+        ++ "\n##### END"
 
 
 actionToString : RawAction -> String
 actionToString action =
     case action of
         TypeText r ->
-            [ "TypeText "
+            [ "##### TypeText "
                 ++ String.fromInt (Time.frameToMs_ r.durationFrames)
                 ++ "ms"
-            , "```"
             , r.text
-            , "```"
             ]
                 |> String.join "\n"
 
         Wait r ->
-            "Wait "
+            "##### Wait "
                 ++ String.fromInt (Time.frameToMs_ r.durationFrames)
                 ++ "ms"
 
         FadeOutAndBlank r ->
-            "FadeOut "
+            "##### FadeOut "
                 ++ String.fromInt (Time.frameToMs_ r.durationFrames)
                 ++ "ms"
 
         BlankText ->
-            "Blank"
+            "##### Blank"
 
         SetText r ->
-            [ "SetText"
-            , "```"
+            [ "##### SetText"
             , r.text
-            , "```"
             ]
                 |> String.join "\n"
 
@@ -172,8 +172,8 @@ parser =
     Parser.succeed identity
         |= Parser.sequence
             { start = ""
-            , separator = "\n\n---\n\n"
-            , end = ""
+            , separator = "\n"
+            , end = "##### END"
             , spaces = Parser.succeed ()
             , item = actionParser
             , trailing = Parser.Optional
@@ -194,35 +194,32 @@ actionParser =
 
 {-|
 
-    TypeText 300ms
-    ```
+    ##### TypeText 300ms
     blabla
 
     def
-    ```
 
 -}
 typeTextParser : Parser RawAction
 typeTextParser =
     Parser.succeed TypeTextOptions
-        |. Parser.token "TypeText "
+        |. Parser.token "##### TypeText "
         |= Parser.map Time.ms Parser.int
-        |. Parser.token "ms\n```\n"
-        |= Parser.getChompedString (Parser.chompUntil "\n```")
-        |. Parser.token "\n```"
+        |. Parser.token "ms\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n#####")
         |= Parser.succeed Nothing
         |> Parser.map TypeText
 
 
 {-|
 
-    Wait 300 ms
+    ##### Wait 300 ms
 
 -}
 waitParser : Parser RawAction
 waitParser =
     Parser.succeed WaitOptions
-        |. Parser.token "Wait "
+        |. Parser.token "##### Wait "
         |= Parser.map Time.ms Parser.int
         |. Parser.token "ms"
         |> Parser.map Wait
@@ -230,13 +227,13 @@ waitParser =
 
 {-|
 
-    FadeOut 300 ms
+    ##### FadeOut 300 ms
 
 -}
 fadeOutParser : Parser RawAction
 fadeOutParser =
     Parser.succeed FadeOutOptions
-        |. Parser.token "FadeOut "
+        |. Parser.token "##### FadeOut "
         |= Parser.map Time.ms Parser.int
         |. Parser.token "ms"
         |> Parser.map FadeOutAndBlank
@@ -244,31 +241,28 @@ fadeOutParser =
 
 {-|
 
-    Blank
+    ##### Blank
 
 -}
 blankParser : Parser RawAction
 blankParser =
     Parser.succeed BlankText
-        |. Parser.token "Blank"
+        |. Parser.token "##### Blank"
 
 
 {-|
 
-    SetText
-    ```
+    ##### SetText
     blabla
 
     def
-    ```
 
 -}
 setTextParser : Parser RawAction
 setTextParser =
     Parser.succeed SetTextOptions
-        |. Parser.token "SetText\n```\n"
-        |= Parser.getChompedString (Parser.chompUntil "\n```")
-        |. Parser.token "\n```"
+        |. Parser.token "##### SetText\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n#####")
         |> Parser.map SetText
 
 
@@ -283,6 +277,7 @@ init () =
       , leftoverDelta = 0
       , dnd = dndSystem.model
       , userText = ""
+      , timelineScrollX = 0
       }
     , Cmd.none
     )
@@ -486,6 +481,7 @@ viewTimeline :
         , state : State
         , hoveringAtFrame : Maybe Int
         , dnd : DnDList.Model
+        , timelineScrollX : Int
     }
     -> Element Msg
 viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame, dnd } as model) =
@@ -532,6 +528,8 @@ viewTimeline ({ currentFrame, zoom, project, state, hoveringAtFrame, dnd } as mo
                     currentFrame
                     (E.rgb255 0xFF 0x00 0x00)
             , E.width E.fill
+            , E.htmlAttribute (Html.Attributes.style "overflow-x" "scroll")
+            , E.htmlAttribute (Html.Events.on "scroll" (onScroll SetScrollX))
             ]
             [ viewSecondsRuler model
             , viewActions model
@@ -651,11 +649,14 @@ viewActionGhost ({ project, dnd } as model) =
 
 
 viewFrameMarker :
-    { a | zoom : Int }
+    { a
+        | zoom : Int
+        , timelineScrollX : Int
+    }
     -> Int
     -> E.Color
     -> Element Msg
-viewFrameMarker { zoom } frame color =
+viewFrameMarker { zoom, timelineScrollX } frame color =
     E.el
         [ E.moveRight
             (toFloat
@@ -1198,7 +1199,7 @@ update msg model =
             let
                 frame =
                     Zoom.pxToFrame
-                        { px = px
+                        { px = px + model.timelineScrollX
                         , zoom = model.zoom
                         }
             in
@@ -1215,7 +1216,7 @@ update msg model =
             let
                 frame =
                     Zoom.pxToFrame
-                        { px = px
+                        { px = px + model.timelineScrollX
                         , zoom = model.zoom
                         }
             in
@@ -1334,6 +1335,11 @@ update msg model =
                     , Cmd.none
                     )
 
+        SetScrollX x ->
+            ( { model | timelineScrollX = x }
+            , Cmd.none
+            )
+
 
 previousActionFrame : Int -> Project -> Int
 previousActionFrame currentFrame { actions } =
@@ -1406,6 +1412,12 @@ onKeyDown key msg =
                 else
                     Json.Decode.fail "don't care"
             )
+
+
+onScroll : (Int -> Msg) -> Decoder Msg
+onScroll toMsg =
+    Json.Decode.at [ "target", "scrollLeft" ] Json.Decode.int
+        |> Json.Decode.map toMsg
 
 
 subscriptions : Model -> Sub Msg
