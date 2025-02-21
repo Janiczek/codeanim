@@ -378,7 +378,6 @@ viewFullscreen model =
         , E.height E.fill
         , EBg.color (E.rgb255 0x00 0x00 0x00)
         ]
-        --(viewSceneForFrame model model.currentFrame)
         (E.html
             (Html.node "x-highlight"
                 [ Html.Attributes.attribute "data-code" scene.text
@@ -461,24 +460,23 @@ viewPreview ({ project, currentFrame, hoveringAtFrame, dnd } as model) =
                 currentFrame
     in
     E.el
-        [ E.width E.fill
-        , E.height E.fill
+        [ E.width (E.px 1024)
+        , E.height (E.px 576)
         , E.centerX
         , E.centerY
         ]
         (E.el
-            [ E.width E.fill
-            , E.height E.fill
-            , E.htmlAttribute (Html.Attributes.style "max-width" "min(1200px, 80vw)")
+            [ E.width (E.px 1024)
+            , E.height (E.px 576)
+            , E.htmlAttribute (Html.Attributes.style "max-width" "min(1024px, 80vw)")
             , E.centerX
             , E.centerY
             , E.padding 20
             ]
             (E.el
-                [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
-                , E.centerY
+                [ E.centerY
                 , E.htmlAttribute (Html.Attributes.style "position" "relative")
-                , E.htmlAttribute (Html.Attributes.style "width" "100%")
+                , E.htmlAttribute (Html.Attributes.style "width" "1024")
                 , E.htmlAttribute (Html.Attributes.style "height" "0")
                 , E.htmlAttribute (Html.Attributes.style "padding-top" "56.25%")
                 , EBo.shadow
@@ -511,8 +509,8 @@ viewScene { project } scene =
     E.el
         [ EBg.color (E.rgb255 0x00 0x00 0x00)
         , E.htmlAttribute (Html.Attributes.style "position" "absolute")
-        , E.htmlAttribute (Html.Attributes.style "width" "100%")
-        , E.htmlAttribute (Html.Attributes.style "height" "100%")
+        , E.htmlAttribute (Html.Attributes.style "width" "1024")
+        , E.htmlAttribute (Html.Attributes.style "height" "576")
         , E.htmlAttribute (Html.Attributes.style "top" "0")
         , E.htmlAttribute (Html.Attributes.style "left" "0")
         ]
@@ -523,14 +521,15 @@ viewScene { project } scene =
             ]
             (E.html <|
                 Svg.svg
-                    [ Svg.Attributes.width "100%"
-                    , Svg.Attributes.viewBox "0 0 1920 1080"
+                    [ Svg.Attributes.width "1024"
+                    , Svg.Attributes.height "576"
+                    , Svg.Attributes.viewBox "0 0 1024 576"
                     ]
                     [ Svg.foreignObject
                         [ Svg.Attributes.width "100%"
                         , Svg.Attributes.height "100%"
-                        , Svg.Attributes.x "48"
-                        , Svg.Attributes.y "48"
+                        , Svg.Attributes.x "96"
+                        , Svg.Attributes.y "0"
                         ]
                         [ Html.node "x-highlight"
                             [ Html.Attributes.attribute "data-code" scene.text
