@@ -529,16 +529,15 @@ viewScene { project } scene =
                     [ Svg.foreignObject
                         [ Svg.Attributes.width "100%"
                         , Svg.Attributes.height "100%"
-
-                        -- holds 10 lines of text
-                        , Svg.Attributes.x "130"
-                        , Svg.Attributes.y "80"
+                        , Svg.Attributes.x "48"
+                        , Svg.Attributes.y "48"
                         ]
                         [ Html.node "x-highlight"
                             [ Html.Attributes.attribute "data-code" scene.text
-                            , Html.Attributes.style "font-size" "38px" -- 42px also OK. This is for the VHS Gothic font.
+                            , Html.Attributes.style "font-size" "24px"
                             , Html.Attributes.style "filter" "grayscale(1)"
                             , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "margin" "1em 0 0 4em"
                             ]
                             []
                         ]
