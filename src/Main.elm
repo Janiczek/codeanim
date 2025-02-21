@@ -7,6 +7,7 @@ import Action
         , RawAction(..)
         , SetTextOptions
         , TypeTextOptions
+        , TypeTextSpeedOptions
         , WaitOptions
         )
 import Browser
@@ -148,6 +149,21 @@ actionToString action =
             ]
                 |> String.join "\n"
 
+        TypeTextSpeed r ->
+            [ "##### TypeTextSpeed "
+                ++ String.fromInt r.charsPerSecond
+                ++ "c/s"
+                ++ (case r.position of
+                        Nothing ->
+                            ""
+
+                        Just position ->
+                            " at " ++ String.fromInt position
+                   )
+            , r.text
+            ]
+                |> String.join "\n"
+
         Wait r ->
             "##### Wait "
                 ++ String.fromInt r.durationFrames
@@ -192,6 +208,7 @@ actionParser : Parser RawAction
 actionParser =
     Parser.oneOf
         [ typeTextParser
+        , typeTextSpeedParser
         , waitParser
         , fadeOutParser
         , blankParser
@@ -222,6 +239,31 @@ typeTextParser =
         |. Parser.token "\n"
         |= Parser.getChompedString (Parser.chompUntil "\n#####")
         |> Parser.map TypeText
+
+
+{-|
+
+    ##### TypeTextSpeed 20c/s
+    blabla
+
+    def
+
+-}
+typeTextSpeedParser : Parser RawAction
+typeTextSpeedParser =
+    Parser.succeed TypeTextSpeedOptions
+        |. Parser.token "##### TypeTextSpeed "
+        |= Parser.int
+        |. Parser.token "c/s"
+        |= Parser.oneOf
+            [ Parser.succeed Just
+                |. Parser.token " at "
+                |= Parser.int
+            , Parser.succeed Nothing
+            ]
+        |. Parser.token "\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n#####")
+        |> Parser.map TypeTextSpeed
 
 
 {-|
@@ -450,7 +492,7 @@ viewSceneForFrame ({ project } as model) frame =
 viewScene : { a | project : Project } -> Scene -> Element Msg
 viewScene { project } scene =
     E.el
-        [ EBg.color (E.rgb255 0x21 0x27 0x33)
+        [ EBg.color (E.rgb255 0x00 0x00 0x00)
         , E.htmlAttribute (Html.Attributes.style "position" "absolute")
         , E.htmlAttribute (Html.Attributes.style "width" "100%")
         , E.htmlAttribute (Html.Attributes.style "height" "100%")
@@ -477,7 +519,9 @@ viewScene { project } scene =
                         ]
                         [ Html.node "x-highlight"
                             [ Html.Attributes.attribute "data-code" scene.text
-                            , Html.Attributes.style "font-size" "60px"
+                            , Html.Attributes.style "font-size" "38px" -- 42px also OK. This is for the VHS Gothic font.
+                            , Html.Attributes.style "filter" "grayscale(1)"
+                            , Html.Attributes.style "color" "white"
                             ]
                             []
                         ]
@@ -773,10 +817,7 @@ viewAddButtons =
             }
         , EBo.color (E.rgb255 0x33 0x33 0x33)
         ]
-        [ {- E.el []
-             (
-          -}
-          E.row [ E.spacing 2 ]
+        [ E.row [ E.spacing 2 ]
             [ viewButton
                 (AddAction
                     (TypeText
@@ -788,6 +829,17 @@ viewAddButtons =
                 )
                 FI.type_
                 "Add 'Type' action"
+            , viewButton
+                (AddAction
+                    (TypeTextSpeed
+                        { text = "Text"
+                        , charsPerSecond = 20
+                        , position = Nothing
+                        }
+                    )
+                )
+                FI.type_
+                "Add 'Type (speed)' action"
             , viewButton
                 (AddAction
                     (Wait
@@ -814,8 +866,6 @@ viewAddButtons =
                 FI.alignLeft
                 "Add 'Set Text' action"
             ]
-
-        -- )
         ]
 
 
