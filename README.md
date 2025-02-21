@@ -22,3 +22,11 @@ be no frame drops.
 
 Note: On FFMPEG wiki I found out I should use `libx264rgb` instead of `libx264`,
 so that it doesn't convert lossily to a different colorspace.
+
+## Grabbing frames with Puppeteer then making video from PNGs
+
+* `npm install`
+* `node src/render.js`
+* `cd render*`
+* `ffmpeg -framerate 60 -i frame%05d.png -c:v libx264rgb -crf 0 output.mp4`
+* `rm frame*`

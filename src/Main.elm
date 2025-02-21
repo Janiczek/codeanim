@@ -7,6 +7,7 @@ import Action
         , RawAction(..)
         , SetTextOptions
         , TypeTextOptions
+        , TypeTextSpeedOptions
         , WaitOptions
         )
 import Browser
@@ -148,6 +149,21 @@ actionToString action =
             ]
                 |> String.join "\n"
 
+        TypeTextSpeed r ->
+            [ "##### TypeTextSpeed "
+                ++ String.fromInt r.charsPerSecond
+                ++ "c/s"
+                ++ (case r.position of
+                        Nothing ->
+                            ""
+
+                        Just position ->
+                            " at " ++ String.fromInt position
+                   )
+            , r.text
+            ]
+                |> String.join "\n"
+
         Wait r ->
             "##### Wait "
                 ++ String.fromInt r.durationFrames
@@ -192,6 +208,7 @@ actionParser : Parser RawAction
 actionParser =
     Parser.oneOf
         [ typeTextParser
+        , typeTextSpeedParser
         , waitParser
         , fadeOutParser
         , blankParser
@@ -222,6 +239,31 @@ typeTextParser =
         |. Parser.token "\n"
         |= Parser.getChompedString (Parser.chompUntil "\n#####")
         |> Parser.map TypeText
+
+
+{-|
+
+    ##### TypeTextSpeed 20c/s
+    blabla
+
+    def
+
+-}
+typeTextSpeedParser : Parser RawAction
+typeTextSpeedParser =
+    Parser.succeed TypeTextSpeedOptions
+        |. Parser.token "##### TypeTextSpeed "
+        |= Parser.int
+        |. Parser.token "c/s"
+        |= Parser.oneOf
+            [ Parser.succeed Just
+                |. Parser.token " at "
+                |= Parser.int
+            , Parser.succeed Nothing
+            ]
+        |. Parser.token "\n"
+        |= Parser.getChompedString (Parser.chompUntil "\n#####")
+        |> Parser.map TypeTextSpeed
 
 
 {-|
@@ -299,8 +341,7 @@ init () =
 view : Model -> Html Msg
 view model =
     E.layout
-        [ EBg.color (E.rgb255 0x70 0x70 0x70)
-        , E.width E.fill
+        [ E.width E.fill
         , E.height E.fill
         ]
         (case model.state of
@@ -326,12 +367,28 @@ view model =
 
 viewFullscreen : Model -> Element Msg
 viewFullscreen model =
+    let
+        scene : Scene
+        scene =
+            Scene.compute model.currentFrame model.project
+    in
     E.el
         [ E.htmlAttribute (Html.Attributes.id "fullscreen-scene")
         , E.width E.fill
         , E.height E.fill
+        , EBg.color (E.rgb255 0x00 0x00 0x00)
         ]
-        (viewSceneForFrame model model.currentFrame)
+        (E.html
+            (Html.node "x-highlight"
+                [ Html.Attributes.attribute "data-code" scene.text
+                , Html.Attributes.style "font-size" "24px"
+                , Html.Attributes.style "filter" "grayscale(1)"
+                , Html.Attributes.style "color" "white"
+                , Html.Attributes.style "margin" "1em 0 0 4em"
+                ]
+                []
+            )
+        )
 
 
 viewEdit : Model -> Element Msg
@@ -340,6 +397,7 @@ viewEdit model =
         [ E.width E.fill
         , E.height E.fill
         , E.clip
+        , EBg.color (E.rgb255 0x70 0x70 0x70)
         ]
         [ E.row
             [ E.width E.fill
@@ -402,24 +460,23 @@ viewPreview ({ project, currentFrame, hoveringAtFrame, dnd } as model) =
                 currentFrame
     in
     E.el
-        [ E.width E.fill
-        , E.height E.fill
+        [ E.width (E.px 1024)
+        , E.height (E.px 576)
         , E.centerX
         , E.centerY
         ]
         (E.el
-            [ E.width E.fill
-            , E.height E.fill
-            , E.htmlAttribute (Html.Attributes.style "max-width" "min(1200px, 80vw)")
+            [ E.width (E.px 1024)
+            , E.height (E.px 576)
+            , E.htmlAttribute (Html.Attributes.style "max-width" "min(1024px, 80vw)")
             , E.centerX
             , E.centerY
             , E.padding 20
             ]
             (E.el
-                [ EBg.color (E.rgb255 0xE0 0xE0 0xE0)
-                , E.centerY
+                [ E.centerY
                 , E.htmlAttribute (Html.Attributes.style "position" "relative")
-                , E.htmlAttribute (Html.Attributes.style "width" "100%")
+                , E.htmlAttribute (Html.Attributes.style "width" "1024")
                 , E.htmlAttribute (Html.Attributes.style "height" "0")
                 , E.htmlAttribute (Html.Attributes.style "padding-top" "56.25%")
                 , EBo.shadow
@@ -450,10 +507,10 @@ viewSceneForFrame ({ project } as model) frame =
 viewScene : { a | project : Project } -> Scene -> Element Msg
 viewScene { project } scene =
     E.el
-        [ EBg.color (E.rgb255 0x21 0x27 0x33)
+        [ EBg.color (E.rgb255 0x00 0x00 0x00)
         , E.htmlAttribute (Html.Attributes.style "position" "absolute")
-        , E.htmlAttribute (Html.Attributes.style "width" "100%")
-        , E.htmlAttribute (Html.Attributes.style "height" "100%")
+        , E.htmlAttribute (Html.Attributes.style "width" "1024")
+        , E.htmlAttribute (Html.Attributes.style "height" "576")
         , E.htmlAttribute (Html.Attributes.style "top" "0")
         , E.htmlAttribute (Html.Attributes.style "left" "0")
         ]
@@ -464,20 +521,22 @@ viewScene { project } scene =
             ]
             (E.html <|
                 Svg.svg
-                    [ Svg.Attributes.width "100%"
-                    , Svg.Attributes.viewBox "0 0 1920 1080"
+                    [ Svg.Attributes.width "1024"
+                    , Svg.Attributes.height "576"
+                    , Svg.Attributes.viewBox "0 0 1024 576"
                     ]
                     [ Svg.foreignObject
                         [ Svg.Attributes.width "100%"
                         , Svg.Attributes.height "100%"
-
-                        -- holds 10 lines of text
-                        , Svg.Attributes.x "130"
-                        , Svg.Attributes.y "80"
+                        , Svg.Attributes.x "96"
+                        , Svg.Attributes.y "0"
                         ]
                         [ Html.node "x-highlight"
                             [ Html.Attributes.attribute "data-code" scene.text
-                            , Html.Attributes.style "font-size" "60px"
+                            , Html.Attributes.style "font-size" "24px"
+                            , Html.Attributes.style "filter" "grayscale(1)"
+                            , Html.Attributes.style "color" "white"
+                            , Html.Attributes.style "margin" "1em 0 0 4em"
                             ]
                             []
                         ]
@@ -773,10 +832,7 @@ viewAddButtons =
             }
         , EBo.color (E.rgb255 0x33 0x33 0x33)
         ]
-        [ {- E.el []
-             (
-          -}
-          E.row [ E.spacing 2 ]
+        [ E.row [ E.spacing 2 ]
             [ viewButton
                 (AddAction
                     (TypeText
@@ -788,6 +844,17 @@ viewAddButtons =
                 )
                 FI.type_
                 "Add 'Type' action"
+            , viewButton
+                (AddAction
+                    (TypeTextSpeed
+                        { text = "Text"
+                        , charsPerSecond = 20
+                        , position = Nothing
+                        }
+                    )
+                )
+                FI.type_
+                "Add 'Type (speed)' action"
             , viewButton
                 (AddAction
                     (Wait
@@ -814,8 +881,6 @@ viewAddButtons =
                 FI.alignLeft
                 "Add 'Set Text' action"
             ]
-
-        -- )
         ]
 
 

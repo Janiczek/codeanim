@@ -11,6 +11,7 @@ import Action
         , FadeOutOptions
         , RawAction(..)
         , TypeTextOptions
+        , TypeTextSpeedOptions
         )
 import Config exposing (fps)
 import Json.Encode
@@ -115,6 +116,9 @@ computeFrom frame endFrame currentAction restOfActions accScene =
                     TypeText r ->
                         advanceTypeText r frame currentAction accScene
 
+                    TypeTextSpeed r ->
+                        advanceTypeTextSpeed r frame currentAction accScene
+
                     Wait _ ->
                         accScene
 
@@ -136,6 +140,55 @@ advanceTypeText { text, durationFrames, position } frame currentAction scene =
         textLength : Int
         textLength =
             String.length text
+
+        previousLength : Int
+        previousLength =
+            charsWritten
+                { stringLength = textLength
+                , durationFrames = durationFrames
+                , currentFrame = frame - currentAction.startFrame - 1
+                }
+
+        newLength : Int
+        newLength =
+            if frame == currentAction.endFrame then
+                textLength
+
+            else
+                charsWritten
+                    { stringLength = textLength
+                    , durationFrames = durationFrames
+                    , currentFrame = frame - currentAction.startFrame
+                    }
+
+        newText : String
+        newText =
+            if previousLength /= newLength then
+                case position of
+                    Nothing ->
+                        scene.text ++ String.slice previousLength newLength text
+
+                    Just position_ ->
+                        String.left (position_ + previousLength) scene.text
+                            ++ String.slice previousLength newLength text
+                            ++ String.dropLeft (position_ + previousLength) scene.text
+
+            else
+                scene.text
+    in
+    { scene | text = newText }
+
+
+advanceTypeTextSpeed : TypeTextSpeedOptions -> Int -> Action -> Scene -> Scene
+advanceTypeTextSpeed ({ text, charsPerSecond, position } as options) frame currentAction scene =
+    let
+        textLength : Int
+        textLength =
+            String.length text
+
+        durationFrames : Int
+        durationFrames =
+            Action.durationFrames (TypeTextSpeed options)
 
         previousLength : Int
         previousLength =
