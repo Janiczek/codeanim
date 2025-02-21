@@ -341,8 +341,7 @@ init () =
 view : Model -> Html Msg
 view model =
     E.layout
-        [ EBg.color (E.rgb255 0x70 0x70 0x70)
-        , E.width E.fill
+        [ E.width E.fill
         , E.height E.fill
         ]
         (case model.state of
@@ -368,12 +367,29 @@ view model =
 
 viewFullscreen : Model -> Element Msg
 viewFullscreen model =
+    let
+        scene : Scene
+        scene =
+            Scene.compute model.currentFrame model.project
+    in
     E.el
         [ E.htmlAttribute (Html.Attributes.id "fullscreen-scene")
         , E.width E.fill
         , E.height E.fill
+        , EBg.color (E.rgb255 0x00 0x00 0x00)
         ]
-        (viewSceneForFrame model model.currentFrame)
+        --(viewSceneForFrame model model.currentFrame)
+        (E.html
+            (Html.node "x-highlight"
+                [ Html.Attributes.attribute "data-code" scene.text
+                , Html.Attributes.style "font-size" "24px"
+                , Html.Attributes.style "filter" "grayscale(1)"
+                , Html.Attributes.style "color" "white"
+                , Html.Attributes.style "margin" "1em 0 0 4em"
+                ]
+                []
+            )
+        )
 
 
 viewEdit : Model -> Element Msg
@@ -382,6 +398,7 @@ viewEdit model =
         [ E.width E.fill
         , E.height E.fill
         , E.clip
+        , EBg.color (E.rgb255 0x70 0x70 0x70)
         ]
         [ E.row
             [ E.width E.fill

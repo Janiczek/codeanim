@@ -29,3 +29,4 @@ so that it doesn't convert lossily to a different colorspace.
 * `node src/render.js`
 * `cd render*`
 * `ffmpeg -framerate 60 -i frame%05d.png -c:v libx264rgb -crf 0 output.mp4`
+* `rm frame*`

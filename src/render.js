@@ -5,7 +5,7 @@ const fs = require('fs').promises;
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
   await page.goto('http://localhost:8000/index.html');
-  await page.setViewport({width: 1920,height:1080});
+  await page.setViewport({width: 1024,height:576});
   await page.type('textarea', `##### TypeTextSpeed 30c/s
 // counter.f80
 main(a, b) {
@@ -41,15 +41,15 @@ main(a, b) {
   while (true) {
     try {
       console.log(`Rendering frame ${frame}`);
+      await page.evaluate(() => { return new Promise((resolve) => setTimeout(() => {resolve()}, 0)); });
       await page.waitForSelector('#fullscreen-scene', {timeout: 500});
       await page.screenshot({path: `render${date}/frame${frame.toString().padStart(5,'0')}.png`});
       await page.keyboard.press('F1');
       frame++;
-
     } catch (e) {
-      console.log('error');
-      console.log(e);
-      await page.screenshot({path: 'error.png'});
+      //console.log('error');
+      //console.log(e);
+      //await page.screenshot({path: 'error.png'});
       break;
     }
   }
